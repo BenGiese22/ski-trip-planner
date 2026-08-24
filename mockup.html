@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Colorado ski trip — planner mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@400;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --pine:#1F3B2E;
+    --pine-dark:#152A20;
+    --snow:#F5F6F2;
+    --paper:#FFFFFF;
+    --ink:#22261F;
+    --ink-soft:#5B6156;
+    --gold:#D99B12;
+    --gold-deep:#96690B;
+    --rust:#B5473B;
+    --line:#DDDFD6;
+    --green-tint:#E4EFDE;
+    --green-mid:#B6D6A2;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--snow);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    line-height:1.6;
+    padding-bottom:86px;
+  }
+  h1,h2,h3{
+    font-family:'Zilla Slab',serif;
+    font-weight:700;
+    margin:0;
+    color:var(--pine-dark);
+  }
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .wrap{max-width:980px;margin:0 auto;padding:0 24px;}
+
+  header.hero{
+    background:var(--pine);
+    color:var(--snow);
+    padding:64px 0 56px;
+    position:relative;
+    overflow:hidden;
+  }
+  header.hero .hero-art{
+    position:absolute;inset:0;width:100%;height:100%;
+    z-index:0;
+  }
+  header.hero .hero-inner{
+    position:relative;z-index:1;
+  }
+  header.hero .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    letter-spacing:0.14em;
+    color:var(--gold);
+    text-transform:uppercase;
+    margin-bottom:14px;
+  }
+  header.hero h1{color:var(--snow);font-size:40px;line-height:1.15;max-width:14ch;}
+  header.hero p{color:#CFE0D5;font-size:16px;max-width:52ch;margin-top:14px;}
+  .hero-stats{display:flex;gap:28px;margin-top:32px;flex-wrap:wrap;}
+  .hero-stat .num{font-family:'IBM Plex Mono',monospace;font-size:22px;color:var(--gold);}
+  .hero-stat .label{font-size:12px;color:#AEC4B7;margin-top:2px;}
+
+  main{padding:56px 0 80px;}
+  section{margin-bottom:64px;position:relative;padding-left:52px;}
+  .marker{
+    position:absolute;left:0;top:2px;
+    width:36px;height:36px;border-radius:50%;
+    background:var(--paper);border:2px solid var(--pine);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;color:var(--pine);
+  }
+  section::before{
+    content:"";position:absolute;left:17px;top:40px;bottom:-64px;
+    border-left:2px dashed var(--line);
+  }
+  section:last-of-type::before{display:none;}
+  .section-head{margin-bottom:6px;}
+  .section-head h2{font-size:24px;}
+  .section-sub{color:var(--ink-soft);font-size:14px;max-width:60ch;margin:6px 0 20px;}
+
+  .card{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:20px 22px;
+  }
+
+  /* step 1: intake */
+  .intake-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .field{display:flex;flex-direction:column;gap:6px;}
+  .field label{font-size:12px;color:var(--ink-soft);font-weight:500;}
+  .field input,.field select{
+    height:38px;border:1px solid var(--line);border-radius:6px;
+    padding:0 12px;font-family:inherit;font-size:14px;background:var(--snow);color:var(--ink);
+  }
+
+  /* step 2: destinations */
+  .dest-card{margin-bottom:14px;}
+  .dest-card.featured{border:2px solid var(--gold);}
+  .dest-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
+  .dest-name{font-size:19px;font-family:'Zilla Slab',serif;font-weight:700;}
+  .badge{
+    font-family:'IBM Plex Mono',monospace;font-size:11px;padding:4px 9px;border-radius:5px;
+    white-space:nowrap;
+  }
+  .badge.gold{background:#FBEDCB;color:var(--gold-deep);}
+  .badge.pine{background:var(--green-tint);color:#2E5B3D;}
+  .dest-meta{display:flex;gap:16px;margin:8px 0 14px;flex-wrap:wrap;}
+  .dest-meta .item{font-size:13px;color:var(--ink-soft);}
+  .dest-meta .item .mono{color:var(--pine-dark);}
+  .dest-tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;}
+  .tile{
+    background:var(--snow);border-radius:8px;padding:12px 14px;
+    border-left:3px solid var(--line);
+  }
+  .tile.mountain{border-left-color:var(--pine);}
+  .tile.logistics{border-left-color:#9AA398;}
+  .tile.food{border-left-color:var(--gold);}
+  .tile.activities{border-left-color:#4E9A63;}
+  .tile .tile-label{
+    font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;
+    text-transform:uppercase;letter-spacing:0.05em;color:var(--ink-soft);margin:0 0 8px;
+  }
+  .tile ul{margin:0;padding-left:16px;}
+  .tile li{font-size:13px;color:var(--ink);margin-bottom:4px;}
+  .tile li:last-child{margin-bottom:0;}
+  .tile li.placeholder{color:var(--ink-soft);font-style:italic;}
+  .source-line{font-size:12px;color:var(--ink-soft);margin-top:10px;}
+  .source-line a{color:var(--pine-dark);}
+
+  /* step 3: calendar */
+  .presets{display:flex;flex-direction:column;gap:8px;margin-bottom:20px;}
+  .preset{
+    display:flex;align-items:center;gap:10px;border:1px solid var(--line);
+    border-radius:6px;padding:10px 14px;font-size:14px;background:var(--paper);
+  }
+  .preset.selected{border-color:var(--gold);background:#FFFAEF;}
+  .preset .dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--pine);flex:none;}
+  .preset.selected .dot{background:var(--gold);border-color:var(--gold-deep);}
+  .preset .muted{color:var(--ink-soft);}
+
+  .cal-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;}
+  .month{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:14px;}
+  .month h3{font-size:15px;text-align:center;margin-bottom:10px;}
+  .dow{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:4px;}
+  .dow span{font-size:10px;text-align:center;color:var(--ink-soft);}
+  .days{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+  .day{
+    aspect-ratio:1;display:flex;align-items:center;justify-content:center;
+    font-size:11px;border-radius:5px;background:var(--snow);color:var(--ink-soft);
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .day.blank{background:transparent;}
+  .day.pick{background:var(--gold);color:#4A3403;font-weight:600;}
+  .day.free{background:var(--green-mid);color:#1F3B14;}
+  .day.blackout{background:#F6DAD6;color:var(--rust);font-weight:600;border:1px dashed var(--rust);}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:16px;font-size:12px;color:var(--ink-soft);}
+  .legend .sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px;}
+
+  /* step 4: getting there */
+  .flight-card{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;}
+  .flight-card .from{font-size:12px;color:var(--gold-deep);font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;}
+  .flight-card h3{font-size:20px;}
+  .flight-card .detail{font-size:13.5px;color:var(--ink-soft);margin-top:6px;}
+  .flight-card .cta{
+    font-size:13px;color:var(--paper);background:var(--pine);padding:9px 16px;border-radius:6px;
+    text-decoration:none;white-space:nowrap;
+  }
+  .flight-note{font-size:12px;color:var(--ink-soft);margin-top:12px;}
+
+  /* step 5: cost */
+  .ski-days{display:flex;gap:8px;margin-bottom:18px;}
+  .ski-days .opt{
+    flex:1;text-align:center;border:1px solid var(--line);border-radius:6px;padding:10px 0;font-size:13px;background:var(--paper);
+  }
+  .ski-days .opt.selected{border-color:var(--gold);background:#FFFAEF;font-weight:600;color:var(--gold-deep);}
+  .pass-compare{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;}
+  .pass-opt{border:1px solid var(--line);border-radius:8px;padding:14px 16px;}
+  .pass-opt.selected{border:2px solid var(--gold);}
+  .pass-opt .tag{font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--gold-deep);margin-bottom:4px;text-transform:uppercase;}
+  .pass-opt .price{font-family:'IBM Plex Mono',monospace;font-size:22px;color:var(--pine-dark);}
+  .pass-opt p{font-size:12.5px;color:var(--ink-soft);margin:6px 0 0;}
+  .cost-table{border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  .cost-row{display:flex;justify-content:space-between;padding:11px 16px;font-size:14px;border-bottom:1px solid var(--line);}
+  .cost-row:last-child{border-bottom:none;background:var(--pine);color:var(--snow);font-weight:600;}
+  .cost-row .val{color:var(--ink-soft);}
+  .cost-row:last-child .val{color:var(--snow);}
+  .cost-note{font-size:12px;color:var(--ink-soft);margin-top:10px;}
+
+  footer{background:var(--pine-dark);color:#AEC4B7;padding:28px 0;font-size:12.5px;}
+  footer a{color:var(--gold);}
+
+  .autosave-note{
+    display:inline-flex;align-items:center;gap:7px;
+    font-size:12px;color:var(--ink-soft);margin-top:12px;
+  }
+  .autosave-note .pulse{
+    width:7px;height:7px;border-radius:50%;background:#4E9A63;flex:none;
+  }
+
+  .save-bar{
+    position:fixed;left:0;right:0;bottom:0;
+    background:var(--pine-dark);
+    border-top:1px solid rgba(255,255,255,0.14);
+    padding:14px 24px;
+    display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+    z-index:50;
+  }
+  .save-bar .status{font-size:12px;color:#AEC4B7;}
+  .save-bar .status .mono{color:#CFE0D5;}
+  .save-btn{
+    font-family:'Inter',sans-serif;font-weight:600;font-size:14px;
+    background:var(--gold);color:#3A2801;border:none;border-radius:6px;
+    padding:11px 20px;cursor:default;
+  }
+
+  @media (max-width:760px){
+    .intake-grid{grid-template-columns:1fr;}
+    .dest-cols{grid-template-columns:1fr;}
+    .cal-grid{grid-template-columns:1fr;}
+    .pass-compare{grid-template-columns:1fr;}
+    header.hero h1{font-size:30px;}
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <svg class="hero-art" viewBox="0 0 1000 300" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
+    <circle cx="845" cy="70" r="34" fill="var(--gold)" opacity="0.85"/>
+    <g opacity="0.5" stroke="var(--gold)" stroke-width="1.5" fill="none" stroke-dasharray="2 7">
+      <path d="M0,40 Q250,10 500,40 T1000,40"/>
+      <path d="M0,68 Q250,40 500,68 T1000,68"/>
+    </g>
+    <polygon points="0,300 0,160 120,60 230,150 310,90 430,180 520,100 640,190 760,120 880,200 1000,140 1000,300" fill="#2C4C3A"/>
+    <polygon points="0,300 0,210 90,150 190,220 300,140 410,215 540,130 660,210 790,150 900,225 1000,175 1000,300" fill="#213E2E"/>
+    <polygon points="0,300 0,255 140,190 260,250 400,180 560,255 700,195 850,260 1000,210 1000,300" fill="#152A20"/>
+  </svg>
+  <div class="wrap hero-inner">
+    <div class="eyebrow">Mockup — placeholder content throughout</div>
+    <h1>Colorado ski weekend, late winter 2027</h1>
+    <p>Megan and I already have the Ikon Base Pass, so we're looking at a trip built around resorts that pass already covers — everyone else can grab a short-term pass for just the days they'll ski (more on that below). This page is here to get a read on who's actually interested and which dates could work, nothing's locked in yet. (Small bonus: the window we're circling happens to land right around Ben's birthday — worth trying to line up for, but not the reason for the trip.)</p>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="num mono">0</div><div class="label">responses so far</div></div>
+      <div class="hero-stat"><div class="num mono">3</div><div class="label">towns to choose from</div></div>
+      <div class="hero-stat"><div class="num mono">Jan–Mar</div><div class="label">rough planning window</div></div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section>
+    <div class="marker">01</div>
+    <div class="section-head"><h2>Start here</h2></div>
+    <p class="section-sub">Takes 20 seconds. This tells the rest of the page what to show you — your airport, for instance, decides which flight info you see in step 4.</p>
+    <div class="card">
+      <div class="intake-grid">
+        <div class="field"><label>Your name</label><input type="text" placeholder="Jamie Rivera" /></div>
+        <div class="field"><label>Bringing a plus one?</label>
+          <select><option>Just me</option><option selected>Me plus a partner</option></select>
+        </div>
+        <div class="field"><label>Home airport</label>
+          <select><option>ORD — Chicago</option><option selected>SFO — San Francisco</option><option>MKE — Milwaukee</option></select>
+        </div>
+        <div class="field"><label>Ski or ride level</label>
+          <select><option selected>Beginner</option><option>Intermediate</option><option>Advanced</option></select>
+        </div>
+      </div>
+      <div class="autosave-note"><span class="pulse"></span>Saves automatically as you go — close this and come back anytime, nothing's lost.</div>
+    </div>
+  </section>
+
+  <section>
+    <div class="marker">02</div>
+    <div class="section-head"><h2>Where to go</h2></div>
+    <p class="section-sub">Skiing is one part of the weekend, not the whole point. Each option below is the mountain, the town, the food, and what else there is to do.</p>
+
+    <div class="card dest-card featured">
+      <div class="dest-top">
+        <div class="dest-name">Steamboat Springs</div>
+        <span class="badge gold">Leaning toward this</span>
+      </div>
+      <div class="dest-meta">
+        <div class="item"><span class="mono">≈3h15</span> drive from DEN</div>
+        <div class="item"><span class="mono">$900–1,300</span> est. per person</div>
+        <div class="item">Direct flights from SFO + ORD this winter</div>
+      </div>
+      <div class="dest-tiles">
+        <div class="tile mountain">
+          <p class="tile-label">On the mountain</p>
+          <ul>
+            <li>Champagne powder, gentle green terrain low on the hill</li>
+            <li>More pitch up top if a few of you want it</li>
+            <li>Lift reservations required on the Ikon network here</li>
+          </ul>
+        </div>
+        <div class="tile logistics">
+          <p class="tile-label">Getting around</p>
+          <ul>
+            <li>Free in-town bus (the SST) links downtown to the gondola</li>
+            <li>A car is optional if you're staying central</li>
+          </ul>
+        </div>
+        <div class="tile food">
+          <p class="tile-label">Food, drink &amp; town</p>
+          <ul>
+            <li>Walkable historic downtown along Lincoln Ave</li>
+            <li>A cluster of breweries within a few blocks of each other</li>
+            <li class="placeholder">Specific restaurant picks — still need real research</li>
+          </ul>
+        </div>
+        <div class="tile activities">
+          <p class="tile-label">Off the snow</p>
+          <ul>
+            <li>Old Town Hot Springs — developed, family-friendly</li>
+            <li>Strawberry Park Hot Springs — rustic, natural pools outside town</li>
+            <li>Shops along Lincoln Ave downtown</li>
+          </ul>
+        </div>
+      </div>
+      <div class="source-line">Sources: <a href="#">steamboat.com — getting here</a>, <a href="#">ikonpass.com — access details</a></div>
+    </div>
+
+    <div class="card dest-card">
+      <div class="dest-top">
+        <div class="dest-name">Summit County — Frisco, Dillon, Silverthorne</div>
+        <span class="badge pine">Best value</span>
+      </div>
+      <div class="dest-meta">
+        <div class="item"><span class="mono">≈1h45</span> drive from DEN</div>
+        <div class="item"><span class="mono">$650–950</span> est. per person</div>
+        <div class="item">Skis Copper Mountain</div>
+      </div>
+      <div class="dest-tiles">
+        <div class="tile mountain">
+          <p class="tile-label">On the mountain</p>
+          <ul>
+            <li>Terrain zoned left to right by ability</li>
+            <li>Mixed group regroups easily at the same base area</li>
+            <li>Unlimited on the Ikon network, no blackout dates</li>
+          </ul>
+        </div>
+        <div class="tile logistics">
+          <p class="tile-label">Getting around</p>
+          <ul>
+            <li>Three towns spread along I-70</li>
+            <li>Free Summit Stage bus connects them, or bring a car</li>
+          </ul>
+        </div>
+        <div class="tile food">
+          <p class="tile-label">Food, drink &amp; town</p>
+          <ul>
+            <li>Frisco's Main Street is the most walkable of the three</li>
+            <li>Silverthorne/Dillon lean toward strip-mall convenience</li>
+            <li class="placeholder">Specific restaurant picks — still need real research</li>
+          </ul>
+        </div>
+        <div class="tile activities">
+          <p class="tile-label">Off the snow</p>
+          <ul>
+            <li>Outlets at Silverthorne for shopping</li>
+            <li>Dillon Reservoir for a scenic walk</li>
+            <li>Cheapest condo/Airbnb inventory of the three towns</li>
+          </ul>
+        </div>
+      </div>
+      <div class="source-line">Sources: <a href="#">ikonpass.com — Copper Mountain access</a>, <a href="#">summitstage.com</a></div>
+    </div>
+
+    <div class="card dest-card">
+      <div class="dest-top">
+        <div class="dest-name">Winter Park</div>
+        <span class="badge pine">Closest to Denver</span>
+      </div>
+      <div class="dest-meta">
+        <div class="item"><span class="mono">≈1h20</span> drive from DEN</div>
+        <div class="item"><span class="mono">$700–1,000</span> est. per person</div>
+        <div class="item">No I-70 — via US-40 / Berthoud Pass</div>
+      </div>
+      <div class="dest-tiles">
+        <div class="tile mountain">
+          <p class="tile-label">On the mountain</p>
+          <ul>
+            <li>Biggest terrain pool of the three</li>
+            <li>Unlimited on the Ikon network</li>
+            <li>Mary Jane side has real bumps and glades if anyone wants more</li>
+          </ul>
+        </div>
+        <div class="tile logistics">
+          <p class="tile-label">Getting around</p>
+          <ul>
+            <li>Small enough to walk most of downtown</li>
+            <li>A car helps for restaurant-hopping to nearby Fraser</li>
+          </ul>
+        </div>
+        <div class="tile food">
+          <p class="tile-label">Food, drink &amp; town</p>
+          <ul>
+            <li>Smaller, lower-key main street than the other two</li>
+            <li>Fewer options, but easy to get a table</li>
+            <li class="placeholder">Specific restaurant picks — still need real research</li>
+          </ul>
+        </div>
+        <div class="tile activities">
+          <p class="tile-label">Off the snow</p>
+          <ul>
+            <li>Fraser Tubing Hill for anyone sitting out a ski day</li>
+            <li>Low-key, farmers-market feel rather than resort-village feel</li>
+          </ul>
+        </div>
+      </div>
+      <div class="source-line">Sources: <a href="#">ikonpass.com — Winter Park access</a>, <a href="#">winterparkresort.com</a></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="marker">03</div>
+    <div class="section-head"><h2>When to go</h2></div>
+    <p class="section-sub">Window is mid-January through mid-March 2027 — snow is typically most reliable in this stretch. Earlier January and the back half of March aren't shown. (If it lines up, this window also happens to sit right around Ben's birthday — a nice bonus, not the driver.)</p>
+
+    <div class="presets">
+      <div class="preset selected"><span class="dot"></span> Thu Jan 28 – Sun Jan 31 <span class="muted">(3 nights)</span></div>
+      <div class="preset"><span class="dot"></span> Fri Jan 29 – Mon Feb 1 <span class="muted">(3 nights, ski on the birthday)</span></div>
+      <div class="preset"><span class="dot"></span> Sat Jan 30 – Wed Feb 3 <span class="muted">(4 nights, lighter midweek crowds)</span></div>
+    </div>
+
+    <div class="cal-grid">
+      <div class="month">
+        <h3>January 2027</h3>
+        <div class="dow"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+        <div class="days">
+          <div class="day blank"></div><div class="day blank"></div><div class="day blank"></div><div class="day blank"></div>
+          <div class="day blank"></div><div class="day blank"></div><div class="day blank"></div>
+          <div class="day blank"></div><div class="day blank"></div><div class="day blank"></div><div class="day blank"></div><div class="day blank"></div><div class="day blank"></div><div class="day blank"></div>
+          <div class="day blank"></div><div class="day blank"></div><div class="day blank"></div><div class="day blank"></div><div class="day blank"></div>
+          <div class="day blackout">16</div><div class="day blackout">17</div>
+          <div class="day">18</div><div class="day">19</div><div class="day">20</div><div class="day">21</div><div class="day">22</div><div class="day">23</div><div class="day">24</div>
+          <div class="day">25</div><div class="day">26</div><div class="day">27</div>
+          <div class="day pick">28</div><div class="day pick">29</div><div class="day pick">30</div><div class="day pick">31</div>
+        </div>
+      </div>
+      <div class="month">
+        <h3>February 2027</h3>
+        <div class="dow"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+        <div class="days">
+          <div class="day pick">1</div><div class="day">2</div><div class="day">3</div><div class="day">4</div><div class="day">5</div><div class="day free">6</div><div class="day free">7</div>
+          <div class="day">8</div><div class="day">9</div><div class="day">10</div><div class="day">11</div><div class="day">12</div>
+          <div class="day blackout">13</div><div class="day blackout">14</div>
+          <div class="day">15</div><div class="day">16</div><div class="day">17</div><div class="day">18</div><div class="day">19</div><div class="day">20</div><div class="day">21</div>
+          <div class="day">22</div><div class="day">23</div><div class="day">24</div><div class="day">25</div><div class="day">26</div><div class="day">27</div><div class="day">28</div>
+        </div>
+      </div>
+      <div class="month">
+        <h3>March 2027</h3>
+        <div class="dow"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+        <div class="days">
+          <div class="day">1</div><div class="day">2</div><div class="day">3</div><div class="day">4</div><div class="day">5</div><div class="day">6</div><div class="day">7</div>
+          <div class="day">8</div><div class="day">9</div><div class="day">10</div><div class="day">11</div><div class="day">12</div><div class="day">13</div><div class="day">14</div>
+          <div class="day">15</div><div class="day blank"></div><div class="day blank"></div><div class="day blank"></div><div class="day blank"></div><div class="day blank"></div><div class="day blank"></div>
+          <div class="day blank"></div><div class="day blank"></div><div class="day blank"></div><div class="day blank"></div><div class="day blank"></div><div class="day blank"></div><div class="day blank"></div>
+          <div class="day blank"></div><div class="day blank"></div><div class="day blank"></div>
+        </div>
+      </div>
+    </div>
+    <div class="legend">
+      <span><span class="sw" style="background:var(--gold);"></span>current suggested window</span>
+      <span><span class="sw" style="background:var(--green-mid);"></span>example — most of the group free</span>
+      <span><span class="sw" style="background:#F6DAD6;border:1px dashed var(--rust);"></span>Ikon blackout (Steamboat only)</span>
+      <span>Blank cells: outside the mid-Jan–mid-Mar window on purpose</span>
+    </div>
+  </section>
+
+  <section>
+    <div class="marker">04</div>
+    <div class="section-head"><h2>Getting there</h2></div>
+    <p class="section-sub">Shown for the airport you picked in step 01 — nobody has to read about the other two.</p>
+    <div class="card flight-card">
+      <div>
+        <div class="from">Your airport — SFO, San Francisco</div>
+        <h3>Nonstop to DEN, daily</h3>
+        <div class="detail">Also a direct seasonal option straight into Steamboat (HDN) this winter if that's the pick — worth comparing against connecting through DEN.</div>
+      </div>
+      <a class="cta" href="https://www.google.com/travel/flights?q=Flights%20from%20SFO%20to%20DEN" target="_blank">Check Google Flights →</a>
+    </div>
+    <div class="flight-note">Example only — Jamie's card shown here. Ben and Chicago-based friends would each see their own version of this card, generated from their step 01 answer.</div>
+  </section>
+
+  <section>
+    <div class="marker">05</div>
+    <div class="section-head"><h2>What it'll cost you</h2></div>
+    <p class="section-sub">Most of this group is skiing 2–3 days, not a whole season — so the multi-day Ikon Session Pass is almost always the right product here, not the unlimited Base Pass.</p>
+
+    <p style="font-size:13px;color:var(--ink-soft);margin-bottom:8px;">How many days would you each like to ski? (Often differs between partners — worth asking separately.)</p>
+    <p style="font-size:12px;color:var(--ink-soft);margin:0 0 6px;">You</p>
+    <div class="ski-days">
+      <div class="opt">1 day</div>
+      <div class="opt selected">2 days</div>
+      <div class="opt">3 days</div>
+      <div class="opt">I already have a pass</div>
+    </div>
+    <div class="ski-days" style="margin-top:6px;">
+      <div class="opt">I'm bringing my own gear</div>
+      <div class="opt selected">I need gear (rental)</div>
+    </div>
+    <p style="font-size:12px;color:var(--ink-soft);margin:14px 0 6px;">Your plus-one</p>
+    <div class="ski-days">
+      <div class="opt">1 day</div>
+      <div class="opt selected">2 days</div>
+      <div class="opt">3 days</div>
+      <div class="opt">They already have a pass</div>
+    </div>
+    <div class="ski-days" style="margin-top:6px;">
+      <div class="opt selected">They're bringing their own gear</div>
+      <div class="opt">They need gear (rental)</div>
+    </div>
+    <div class="autosave-note" style="margin:14px 0 18px;"><span class="pulse"></span>Both selections save to your response, same as everything else on this page — the cost table below and Ben's group rollup both read from what you pick here.</div>
+
+    <div class="pass-opt selected" style="margin-bottom:14px;">
+      <div class="tag">Recommended for 2 days</div>
+      <div class="price mono">$319</div>
+      <p>Ikon Session Pass, 2-day — this is the published starting price, not an estimate. Covers Copper, Winter Park, Steamboat, Eldora and A-Basin. 1-day and 3-day options are also available, priced at checkout on ikonpass.com. Same blackout window as the Base Pass.</p>
+    </div>
+    <p class="cost-note" style="margin:0 0 18px;">Ben and Megan already hold the season-long Base Pass, so you won't see that option pushed here — it only pencils out if you're planning more than one trip to these mountains this winter, which is unlikely for most of the group.</p>
+
+    <div class="cost-table">
+      <div class="cost-row"><span>Flight, round trip (SFO)</span><span class="val mono">$180 – $340</span></div>
+      <div class="cost-row"><span>Lodging share, 4 nights</span><span class="val mono">$220 – $400</span></div>
+      <div class="cost-row"><span>2-day Ikon Session Pass</span><span class="val mono">$319</span></div>
+      <div class="cost-row"><span>Rental package, 2 days (≈$50/day)</span><span class="val mono">≈$100</span></div>
+      <div class="cost-row"><span>Food &amp; après, 4 days (≈$55/day)</span><span class="val mono">≈$220</span></div>
+      <div class="cost-row"><span>Estimated total, per person</span><span class="val mono">$1,040 – $1,380</span></div>
+    </div>
+    <div class="cost-note">Shown for the "you, 2 days, need a rental" example above — your plus-one's version of this table would drop the rental line entirely, since they said they're bringing their own gear. All figures are placeholders to be replaced with real quotes — see the implementation plan for where each one needs a source.</div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    Static mockup — no working links, calculations, or saved data. Built to react to before the real thing gets built. See <a href="#">the implementation plan</a> for how this becomes a working app.
+  </div>
+</footer>
+<div class="save-bar">
+  <div class="status"><span class="mono">Autosaving</span> · last saved just now — every answer above is already stored</div>
+  <button class="save-btn">Save &amp; finish →</button>
+</div>
+
+</body>
+</html>
