@@ -76,11 +76,17 @@ export function AdminHeatmap({
                   >
                     <span className="text-[11px]">{cell.dayOfMonth}</span>
                     {/* The number, not just the shade, is what makes density
-                        legible without colour perception. */}
-                    <span className="font-mono text-[9px] opacity-90">
-                      {cell.available}
-                      {cell.maybe > 0 ? `+${cell.maybe}` : ""}
-                    </span>
+                        legible without colour perception. Days nobody has
+                        marked show no number at all — across ~50 empty cells a
+                        literal 0 is noise, and a bare date reads as "nobody"
+                        once the caption says so. The accessible label still
+                        spells it out either way. */}
+                    {cell.available + cell.maybe > 0 && (
+                      <span className="font-mono text-[9px] opacity-90">
+                        {cell.available}
+                        {cell.maybe > 0 ? `+${cell.maybe}` : ""}
+                      </span>
+                    )}
                   </div>
                 );
               })}
@@ -91,8 +97,9 @@ export function AdminHeatmap({
 
       <p className="text-xs text-ink-soft mt-4">
         Each cell shows the day, then how many said yes — and after a{" "}
-        <span className="font-mono">+</span>, how many said maybe. Shading blends
-        the two, counting a maybe as a quarter of a yes.{" "}
+        <span className="font-mono">+</span>, how many said maybe. A date on its
+        own means nobody has marked it yet. Shading blends the two, counting a
+        maybe as a quarter of a yes.{" "}
         {totalRespondents > 0
           ? `Out of ${totalRespondents} finished ${
               totalRespondents === 1 ? "response" : "responses"
