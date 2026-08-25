@@ -7,6 +7,7 @@ export const costAssumptions = {
     SFO: [180, 340],
     ORD: [160, 300],
     MKE: [150, 320],
+    MSP: [140, 290],
   },
   lodgingPerNightByDestination: {
     steamboat: [70, 130], // per person, 4-6 to a condo

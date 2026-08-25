@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { airports } from "../src/data/airports";
 
 test("hero renders", async ({ page }) => {
   await page.goto("/");
@@ -22,20 +23,22 @@ test("all three destinations render with four labeled tiles each", async ({ page
   }
 });
 
+// Derived from the airports data rather than a hardcoded list, so adding an
+// airport is a one-line data change instead of a test edit. The invariant is
+// "every airport we know about gets a working link", not "there are three".
 test("flight cards link to the correct Google Flights query per airport", async ({ page }) => {
   await page.goto("/");
 
-  const expected: Record<string, string> = {
-    SFO: "https://www.google.com/travel/flights?q=Flights%20from%20SFO%20to%20DEN",
-    ORD: "https://www.google.com/travel/flights?q=Flights%20from%20ORD%20to%20DEN",
-    MKE: "https://www.google.com/travel/flights?q=Flights%20from%20MKE%20to%20DEN",
-  };
+  const expected = airports.map(
+    (airport) =>
+      `https://www.google.com/travel/flights?q=Flights%20from%20${airport.code}%20to%20DEN`,
+  );
 
   const links = page.getByRole("link", { name: /check google flights/i });
-  await expect(links).toHaveCount(3);
+  await expect(links).toHaveCount(airports.length);
 
   const hrefs = await links.evaluateAll((els) => els.map((el) => el.getAttribute("href")));
-  expect(new Set(hrefs)).toEqual(new Set(Object.values(expected)));
+  expect(new Set(hrefs)).toEqual(new Set(expected));
 });
 
 test("Ikon Session Pass pricing is visible and the Base Pass appears only as a note", async ({

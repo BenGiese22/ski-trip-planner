@@ -21,7 +21,7 @@ export type Destination = {
   sources: Source[];
 };
 
-export type AirportCode = "SFO" | "ORD" | "MKE";
+export type AirportCode = "SFO" | "ORD" | "MKE" | "MSP";
 
 export type Airport = {
   code: AirportCode;
