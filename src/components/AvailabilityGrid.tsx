@@ -42,6 +42,7 @@ function describe(date: string) {
 export function AvailabilityGrid() {
   const { response, setAvailability } = useResponse();
   const destinationSlug = response?.destinationSlug ?? null;
+  const started = response !== null;
 
   const statuses = useMemo(() => {
     const map = new Map<string, AvailabilityStatus>();
@@ -146,6 +147,15 @@ export function AvailabilityGrid() {
   const blackoutDestinations = destinations
     .filter((destination) => destination.slug === destinationSlug)
     .map((destination) => destination.name);
+
+  if (!started) {
+    return (
+      <p className="text-sm text-ink-soft border border-line rounded-lg p-4">
+        Answer the questions up top and the calendar opens up here, so you can
+        mark the days that could work for you.
+      </p>
+    );
+  }
 
   return (
     <div>

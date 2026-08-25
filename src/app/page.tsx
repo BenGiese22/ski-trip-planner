@@ -35,14 +35,10 @@ export default async function Home() {
         <Section
           id="you"
           number="01"
-          title={response ? "Your response" : "Start here"}
-          subtitle={
-            response
-              ? "Here's what you've told us so far. Change anything you like — it saves as you go."
-              : "Five quick questions, then the rest of the page tailors itself to your answers. Nothing here is a commitment."
-          }
+          title="You"
+          subtitle="Five quick questions, and the rest of the page tailors itself to your answers. Nothing here is a commitment, and everything saves itself as you go."
         >
-          {response && <WelcomeBack />}
+          <WelcomeBack />
           <IntakeForm />
         </Section>
 
@@ -83,14 +79,7 @@ export default async function Home() {
           </div>
 
           <div className="mt-4">
-            {response ? (
-              <AvailabilityGrid />
-            ) : (
-              <p className="text-sm text-ink-soft border border-line rounded-lg p-4">
-                Answer the questions up top and the calendar opens up here, so
-                you can mark the days that could work for you.
-              </p>
-            )}
+            <AvailabilityGrid />
           </div>
         </Section>
 
@@ -98,11 +87,7 @@ export default async function Home() {
           id="getting-there"
           number="04"
           title="Getting there"
-          subtitle={
-            response
-              ? "Your home airport, and where to check current fares."
-              : "Flight links for each home airport in the group — check current fares directly on Google Flights."
-          }
+          subtitle="Where to check current fares — Google Flights has the live prices."
         >
           <FlightCards />
         </Section>

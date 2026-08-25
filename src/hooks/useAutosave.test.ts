@@ -13,16 +13,22 @@ describe("useAutosave", () => {
     vi.useRealTimers();
   });
 
-  const flushMicrotasks = () => act(async () => undefined);
+  /**
+   * Saves are serialised through a promise chain, so starting one costs a
+   * microtask hop. advanceTimersByTimeAsync drives the timers and flushes that
+   * chain; plain advanceTimersByTime would assert before the save has begun.
+   */
+  const advance = (ms: number) =>
+    act(async () => {
+      await vi.advanceTimersByTimeAsync(ms);
+    });
 
   it("does not save before the debounce window elapses", async () => {
     const save = vi.fn().mockResolvedValue(undefined);
     const { result } = renderHook(() => useAutosave<Patch>(save));
 
     act(() => result.current.queue({ notes: "a" }));
-    act(() => {
-      vi.advanceTimersByTime(AUTOSAVE_DELAY_MS - 1);
-    });
+    await advance(AUTOSAVE_DELAY_MS - 1);
 
     expect(save).not.toHaveBeenCalled();
   });
@@ -32,10 +38,7 @@ describe("useAutosave", () => {
     const { result } = renderHook(() => useAutosave<Patch>(save));
 
     act(() => result.current.queue({ notes: "a" }));
-    act(() => {
-      vi.advanceTimersByTime(AUTOSAVE_DELAY_MS);
-    });
-    await flushMicrotasks();
+    await advance(AUTOSAVE_DELAY_MS);
 
     expect(save).toHaveBeenCalledExactlyOnceWith({ notes: "a" });
   });
@@ -47,18 +50,11 @@ describe("useAutosave", () => {
     const { result } = renderHook(() => useAutosave<Patch>(save));
 
     act(() => result.current.queue({ notes: "a" }));
-    act(() => {
-      vi.advanceTimersByTime(200);
-    });
+    await advance(200);
     act(() => result.current.queue({ skiDays: 3 }));
-    act(() => {
-      vi.advanceTimersByTime(200);
-    });
+    await advance(200);
     act(() => result.current.queue({ notes: "ab" }));
-    act(() => {
-      vi.advanceTimersByTime(AUTOSAVE_DELAY_MS);
-    });
-    await flushMicrotasks();
+    await advance(AUTOSAVE_DELAY_MS);
 
     expect(save).toHaveBeenCalledExactlyOnceWith({ notes: "ab", skiDays: 3 });
   });
@@ -68,8 +64,9 @@ describe("useAutosave", () => {
     const { result } = renderHook(() => useAutosave<Patch>(save));
 
     act(() => result.current.queue({ gearStatus: "own" }));
-    act(() => result.current.flush());
-    await flushMicrotasks();
+    await act(async () => {
+      await result.current.flush();
+    });
 
     expect(save).toHaveBeenCalledExactlyOnceWith({ gearStatus: "own" });
   });
@@ -78,8 +75,9 @@ describe("useAutosave", () => {
     const save = vi.fn().mockResolvedValue(undefined);
     const { result } = renderHook(() => useAutosave<Patch>(save));
 
-    act(() => result.current.flush());
-    await flushMicrotasks();
+    await act(async () => {
+      await result.current.flush();
+    });
 
     expect(save).not.toHaveBeenCalled();
   });
@@ -92,9 +90,7 @@ describe("useAutosave", () => {
     expect(result.current.status).toBe("idle");
 
     act(() => result.current.queue({ notes: "a" }));
-    act(() => {
-      vi.advanceTimersByTime(AUTOSAVE_DELAY_MS);
-    });
+    await advance(AUTOSAVE_DELAY_MS);
     expect(result.current.status).toBe("saving");
 
     await act(async () => {
@@ -116,22 +112,87 @@ describe("useAutosave", () => {
     const { result } = renderHook(() => useAutosave<Patch>(save));
 
     act(() => result.current.queue({ notes: "first" }));
-    act(() => {
-      vi.advanceTimersByTime(AUTOSAVE_DELAY_MS);
-    });
+    await advance(AUTOSAVE_DELAY_MS);
     expect(save).toHaveBeenCalledTimes(1);
 
     act(() => result.current.queue({ notes: "second" }));
     await act(async () => {
       resolveFirst();
     });
-    act(() => {
-      vi.advanceTimersByTime(AUTOSAVE_DELAY_MS);
-    });
-    await flushMicrotasks();
+    await advance(AUTOSAVE_DELAY_MS);
 
     expect(save).toHaveBeenCalledTimes(2);
     expect(save).toHaveBeenLastCalledWith({ notes: "second" });
+  });
+
+  /**
+   * "Save & finish" flushes and then immediately asks the server to validate
+   * the row. If flush resolves before the PATCH lands, the server checks a row
+   * that hasn't been written yet and rejects a response that is actually
+   * complete — exactly what the mobile e2e run caught.
+   */
+  it("resolves flush only once the save has actually landed", async () => {
+    let resolveSave!: () => void;
+    const save = vi.fn().mockReturnValue(new Promise<void>((r) => (resolveSave = r)));
+    const { result } = renderHook(() => useAutosave<Patch>(save));
+
+    act(() => result.current.queue({ skiDays: 2 }));
+
+    let flushed = false;
+    await act(async () => {
+      void result.current.flush().then(() => {
+        flushed = true;
+      });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(flushed).toBe(false);
+
+    await act(async () => {
+      resolveSave();
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(flushed).toBe(true);
+  });
+
+  it("flush waits for an in-flight save and the change queued behind it", async () => {
+    const resolvers: (() => void)[] = [];
+    const save = vi.fn().mockImplementation(
+      () =>
+        new Promise<void>((r) => {
+          resolvers.push(r);
+        }),
+    );
+    const { result } = renderHook(() => useAutosave<Patch>(save));
+
+    act(() => result.current.queue({ skiDays: 2 }));
+    await advance(AUTOSAVE_DELAY_MS);
+    expect(save).toHaveBeenCalledTimes(1);
+
+    // A second change arrives while the first request is still out.
+    act(() => result.current.queue({ gearStatus: "rental" }));
+
+    let flushed = false;
+    await act(async () => {
+      void result.current.flush().then(() => {
+        flushed = true;
+      });
+      resolvers[0]();
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(flushed).toBe(false);
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(save).toHaveBeenLastCalledWith({ gearStatus: "rental" });
+
+    await act(async () => {
+      resolvers[1]();
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(flushed).toBe(true);
   });
 
   // Section 14: retry quietly, and only surface an indicator if it keeps
@@ -145,15 +206,11 @@ describe("useAutosave", () => {
     const { result } = renderHook(() => useAutosave<Patch>(save));
 
     act(() => result.current.queue({ notes: "a" }));
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS);
-    });
+    await advance(AUTOSAVE_DELAY_MS);
 
     expect(result.current.status).not.toBe("error");
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(5_000);
-    });
+    await advance(5_000);
 
     expect(result.current.status).toBe("saved");
     expect(save.mock.calls.length).toBeGreaterThanOrEqual(2);
@@ -164,10 +221,8 @@ describe("useAutosave", () => {
     const { result } = renderHook(() => useAutosave<Patch>(save, { maxRetries: 2 }));
 
     act(() => result.current.queue({ notes: "a" }));
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS);
-      await vi.advanceTimersByTimeAsync(30_000);
-    });
+    await advance(AUTOSAVE_DELAY_MS);
+    await advance(30_000);
 
     expect(result.current.status).toBe("error");
   });
@@ -177,17 +232,13 @@ describe("useAutosave", () => {
     const { result } = renderHook(() => useAutosave<Patch>(save, { maxRetries: 1 }));
 
     act(() => result.current.queue({ notes: "a" }));
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS);
-      await vi.advanceTimersByTimeAsync(30_000);
-    });
+    await advance(AUTOSAVE_DELAY_MS);
+    await advance(30_000);
     expect(result.current.status).toBe("error");
 
     save.mockResolvedValue(undefined);
     act(() => result.current.queue({ notes: "b" }));
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS);
-    });
+    await advance(AUTOSAVE_DELAY_MS);
 
     expect(result.current.status).toBe("saved");
   });
@@ -198,10 +249,7 @@ describe("useAutosave", () => {
 
     act(() => result.current.queue({ notes: "a" }));
     unmount();
-    act(() => {
-      vi.advanceTimersByTime(AUTOSAVE_DELAY_MS * 4);
-    });
-    await flushMicrotasks();
+    await advance(AUTOSAVE_DELAY_MS * 4);
 
     expect(save).not.toHaveBeenCalled();
   });

@@ -88,7 +88,7 @@ export function ResponseProvider({
       // on a round trip to redraw.
       setResponse((current) => (current ? { ...current, ...patch } : current));
       fields.queue(patch);
-      if (immediate) fields.flush();
+      if (immediate) void fields.flush();
     },
     [fields],
   );
@@ -97,16 +97,17 @@ export function ResponseProvider({
     (entries: AvailabilityEntry[]) => {
       setResponse((current) => (current ? { ...current, availability: entries } : current));
       availability.queue({ entries });
-      availability.flush();
+      void availability.flush();
     },
     [availability],
   );
 
   const finish = useCallback(async () => {
-    // Anything still sitting in the debounce window has to land before the
-    // server checks the row for completeness.
-    fields.flush();
-    availability.flush();
+    // Await, don't just trigger: the server is about to validate this row for
+    // completeness, so every pending write has to have landed first. Firing
+    // and hoping loses the race on a slow connection, and the person gets
+    // told to fill in answers they already gave.
+    await Promise.all([fields.flush(), availability.flush()]);
 
     const res = await fetch("/api/respondents/finish", { method: "POST" });
     if (res.status === 422) {
