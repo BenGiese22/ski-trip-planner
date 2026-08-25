@@ -1,10 +1,24 @@
+"use client";
+
 import { airports } from "@/data/airports";
 import { googleFlightsUrl } from "@/lib/flights";
+import { useResponse } from "./ResponseProvider";
 
+/**
+ * Once intake has run, only the respondent's own airport is worth showing —
+ * nobody needs to read about the other two cities' flight options (section 3).
+ * Before that, all three stand as reference content.
+ */
 export function FlightCards() {
+  const { response } = useResponse();
+
+  const shown = response
+    ? airports.filter((airport) => airport.code === response.homeAirport)
+    : airports;
+
   return (
     <div className="flex flex-col gap-3.5">
-      {airports.map((airport) => (
+      {shown.map((airport) => (
         <div
           key={airport.code}
           className="bg-paper border border-line rounded-xl p-5 flex justify-between items-center gap-4 flex-wrap"
