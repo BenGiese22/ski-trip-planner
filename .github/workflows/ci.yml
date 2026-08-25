@@ -30,6 +30,11 @@ jobs:
       - name: Unit tests
         run: npm run test:unit
 
+      # No `services:` block needed. Playwright's globalSetup starts its own
+      # throwaway postgres:16 container and pushes the schema, which keeps the
+      # local and CI paths identical — Docker is preinstalled on ubuntu-latest
+      # and the runner user is in the docker group. Set DATABASE_URL here to
+      # point the suite at an external database instead.
       - name: E2E tests
         run: npm run test:e2e
 
