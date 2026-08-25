@@ -1,8 +1,12 @@
 import { z } from "zod";
 import { eachDateInWindow, isInWindow } from "./dates";
 
-export const airportCodeSchema = z.enum(["SFO", "ORD", "MKE"]);
-export const skiLevelSchema = z.enum(["beginner", "intermediate", "advanced"]);
+export const airportCodeSchema = z.enum(["SFO", "ORD", "MKE"], {
+  message: "Pick the airport you'd fly from",
+});
+export const skiLevelSchema = z.enum(["beginner", "intermediate", "advanced"], {
+  message: "Let us know roughly how comfortable you are on snow",
+});
 export const gearStatusSchema = z.enum(["own", "rental"]);
 export const destinationSlugSchema = z.enum(["steamboat", "summitCounty", "winterPark"]);
 export const availabilityStatusSchema = z.enum(["available", "maybe", "unavailable"]);

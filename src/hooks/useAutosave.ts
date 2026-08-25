@@ -17,8 +17,12 @@ export type Autosave<T extends object> = {
   lastSavedAt: number | null;
   /** Debounced. Patches queued inside one window are merged into one request. */
   queue: (patch: Partial<T>) => void;
-  /** Immediate — for blur, and for selects and toggles where waiting is pointless. */
-  flush: () => void;
+  /**
+   * Immediate — for blur, selects and toggles, and before anything that reads
+   * the row back from the server. Resolves once the write has actually landed,
+   * so "Save & finish" can await it rather than racing it.
+   */
+  flush: () => Promise<void>;
 };
 
 /**
@@ -34,9 +38,13 @@ export function useAutosave<T extends object>(
 
   const pending = useRef<Partial<T>>({});
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const inFlight = useRef(false);
   const attempts = useRef(0);
   const mounted = useRef(true);
+
+  // Serialises every save. Two requests writing the same row concurrently
+  // could otherwise land out of order, and it's what lets flush await
+  // whatever is already in flight rather than starting a second one.
+  const chain = useRef<Promise<void>>(Promise.resolve());
 
   // `save` is typically an inline closure, so it changes identity every
   // render. Holding it in a ref keeps the debounce timer from being torn down
@@ -46,8 +54,7 @@ export function useAutosave<T extends object>(
     saveRef.current = save;
   });
 
-  // Lets `run` reschedule itself without referencing its own binding before
-  // it's initialised.
+  // Lets a retry reschedule without referencing a binding before it exists.
   const runRef = useRef<() => void>(() => {});
 
   useEffect(() => {
@@ -58,8 +65,8 @@ export function useAutosave<T extends object>(
     };
   }, []);
 
-  const run = useCallback(async () => {
-    if (!mounted.current || inFlight.current) return;
+  const doSave = useCallback(async () => {
+    if (!mounted.current) return;
 
     const patch = pending.current;
     if (Object.keys(patch).length === 0) return;
@@ -67,7 +74,6 @@ export function useAutosave<T extends object>(
     // Claim the patch before awaiting, so a change made mid-request lands in
     // a fresh object rather than being wiped when this one resolves.
     pending.current = {};
-    inFlight.current = true;
     setStatus("saving");
 
     try {
@@ -76,6 +82,11 @@ export function useAutosave<T extends object>(
       attempts.current = 0;
       setStatus("saved");
       setLastSavedAt(Date.now());
+
+      // Anything queued while that was out still needs writing.
+      if (Object.keys(pending.current).length > 0) {
+        timer.current = setTimeout(() => runRef.current(), AUTOSAVE_DELAY_MS);
+      }
     } catch {
       if (!mounted.current) return;
       attempts.current += 1;
@@ -95,15 +106,13 @@ export function useAutosave<T extends object>(
           RETRY_BASE_MS * 2 ** (attempts.current - 1),
         );
       }
-    } finally {
-      inFlight.current = false;
-    }
-
-    // Anything queued during the request still needs writing.
-    if (mounted.current && Object.keys(pending.current).length > 0 && attempts.current === 0) {
-      timer.current = setTimeout(() => runRef.current(), AUTOSAVE_DELAY_MS);
     }
   }, [maxRetries]);
+
+  const run = useCallback((): Promise<void> => {
+    chain.current = chain.current.then(doSave, doSave);
+    return chain.current;
+  }, [doSave]);
 
   useEffect(() => {
     runRef.current = () => void run();
@@ -113,14 +122,17 @@ export function useAutosave<T extends object>(
     (patch: Partial<T>) => {
       pending.current = { ...pending.current, ...patch };
       if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(() => void run(), AUTOSAVE_DELAY_MS);
+      timer.current = setTimeout(() => runRef.current(), AUTOSAVE_DELAY_MS);
     },
-    [run],
+    [],
   );
 
-  const flush = useCallback(() => {
+  const flush = useCallback(async () => {
     if (timer.current) clearTimeout(timer.current);
-    void run();
+    // First pass drains whatever is in flight or already queued; the second
+    // picks up a change that arrived behind an in-flight request.
+    await run();
+    if (Object.keys(pending.current).length > 0) await run();
   }, [run]);
 
   return { status, lastSavedAt, queue, flush };

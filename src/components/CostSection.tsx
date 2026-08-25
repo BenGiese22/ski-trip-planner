@@ -176,7 +176,7 @@ function ExampleCosts() {
 
 function CostTable({ estimate }: { estimate: TripCostEstimate }) {
   return (
-    <div className="border border-line rounded-lg overflow-hidden">
+    <div data-testid="cost-table" className="border border-line rounded-lg overflow-hidden">
       {estimate.lineItems.map((item) => (
         <div
           key={item.label}

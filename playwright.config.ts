@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
+import { databaseUrl } from "./e2e/database";
 
 // This dev container ships a preinstalled Chromium at a fixed path (see
 // repo root system notes); CI runners install their own via
@@ -11,10 +12,12 @@ const executablePath = existsSync(localChromiumPath)
 
 export default defineConfig({
   testDir: "./e2e",
-  fullyParallel: true,
+  globalSetup: "./e2e/global-setup.ts",
+  globalTeardown: "./e2e/global-teardown.ts",
+  fullyParallel: false,
+  workers: 1,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
   reporter: "html",
   use: {
     baseURL: "http://localhost:3000",
@@ -40,6 +43,9 @@ export default defineConfig({
     command: "npm run build && npm run start",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    timeout: 180_000,
+    // The app's DB client prefers DATABASE_URL, so this is what keeps a test
+    // run pointed at the throwaway Postgres instead of production Supabase.
+    env: { DATABASE_URL: databaseUrl },
   },
 });
