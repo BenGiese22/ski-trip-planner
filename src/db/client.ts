@@ -29,9 +29,9 @@ function createClient(): Database {
   if (!connectionString) {
     throw new Error(
       "No database connection string. Set DATABASE_URL (local/CI) or POSTGRES_URL " +
-        "(Supabase, injected by Vercel). Note that `vercel env pull` cannot retrieve " +
-        "POSTGRES_URL — it's marked sensitive, so copy it from the Supabase dashboard " +
-        "into .env.local for local use. See PLAN.md section 12.",
+        "(Supabase, injected by Vercel). If `vercel env pull` left POSTGRES_URL out of " +
+        ".env.local, the variable is scoped to production/preview only — add " +
+        "'development' to its target list and pull again. See PLAN.md section 12.",
     );
   }
 
