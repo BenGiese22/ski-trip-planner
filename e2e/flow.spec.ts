@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { airports } from "../src/data/airports";
 import { truncateAll } from "./database";
 import { databaseUrl } from "./database";
 import {
@@ -22,8 +23,10 @@ test("a first-time visitor sees intake and no personalised sections yet", async 
   await expect(page.getByRole("button", { name: /start my response/i })).toBeVisible();
   await expect(page.getByRole("heading", { name: /welcome back/i })).toBeHidden();
 
-  // All three airports stand as reference content until we know theirs.
-  await expect(page.getByRole("link", { name: /check google flights/i })).toHaveCount(3);
+  // Every airport stands as reference content until we know theirs.
+  await expect(page.getByRole("link", { name: /check google flights/i })).toHaveCount(
+    airports.length,
+  );
 
   // And the save bar has nothing to save yet.
   await expect(page.getByRole("button", { name: /save & finish/i })).toBeHidden();

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { eachDateInWindow, isInWindow } from "./dates";
 
-export const airportCodeSchema = z.enum(["SFO", "ORD", "MKE"], {
+export const airportCodeSchema = z.enum(["SFO", "ORD", "MKE", "MSP"], {
   message: "Pick the airport you'd fly from",
 });
 export const skiLevelSchema = z.enum(["beginner", "intermediate", "advanced"], {

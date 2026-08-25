@@ -44,14 +44,16 @@ describe("intakeSchema", () => {
     expect(parsed.name).toBe("Jamie Rivera");
   });
 
-  // Section 16 decision 4 dropped 'OTHER' from the airport list.
-  it("accepts only SFO, ORD and MKE as home airports", () => {
-    for (const code of ["SFO", "ORD", "MKE"]) {
+  // Section 16 decision 4 dropped 'OTHER' from the airport list; MSP was
+  // added later, after the original four-airport list turned out to be missing
+  // someone.
+  it("accepts the four home airports in the group", () => {
+    for (const code of ["SFO", "ORD", "MKE", "MSP"]) {
       expect(intakeSchema.safeParse({ ...validIntake, homeAirport: code }).success).toBe(
         true,
       );
     }
-    for (const code of ["OTHER", "DEN", "sfo", ""]) {
+    for (const code of ["OTHER", "DEN", "sfo", "msp", ""]) {
       expect(intakeSchema.safeParse({ ...validIntake, homeAirport: code }).success).toBe(
         false,
       );

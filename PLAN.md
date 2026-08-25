@@ -4,7 +4,7 @@
 
 **Purpose of this page, stated plainly (should be up top in the real app, not just implied):** this is an early-stage interest and scheduling check, not a booked trip. The job is to find out who's actually interested and which dates could realistically work — not to sell anyone on a finished plan. Keep the copy throughout the app matched to that: tentative, inviting responses rather than announcing decisions.
 
-**Trip context:** a Colorado ski weekend sometime in the mid-January to mid-March 2027 window (snow reliability is the main driver of that range). Ben and Megan already hold the Ikon Base Pass, which is why the destination shortlist is built around resorts that pass already covers — other guests aren't assumed to have any pass, and will most likely buy a short, multi-day Ikon Session Pass sized to however many days they actually ski (see section 8). Group size and the actual send list aren't finalized — likely a friend group skewing toward couples, mixed ski ability, home airports SFO / ORD / MKE — so don't hardcode a headcount anywhere in the UI or copy (see note below). Candidate destinations: Steamboat Springs, Summit County (Copper Mountain), Winter Park.
+**Trip context:** a Colorado ski weekend sometime in the mid-January to mid-March 2027 window (snow reliability is the main driver of that range). Ben and Megan already hold the Ikon Base Pass, which is why the destination shortlist is built around resorts that pass already covers — other guests aren't assumed to have any pass, and will most likely buy a short, multi-day Ikon Session Pass sized to however many days they actually ski (see section 8). Group size and the actual send list aren't finalized — likely a friend group skewing toward couples, mixed ski ability, home airports SFO / ORD / MKE / MSP — so don't hardcode a headcount anywhere in the UI or copy (see note below). Candidate destinations: Steamboat Springs, Summit County (Copper Mountain), Winter Park.
 
 One scheduling note, worth keeping as a minor aside rather than the trip's framing: the window under consideration happens to land around Ben's birthday (Feb 1, a Monday). That's a nice bonus if the dates line up, not the reason for the trip — the hero copy and section intros in the mockup treat it that way deliberately, and any content Claude Code writes should follow the same tone rather than leading with it.
 
@@ -89,7 +89,7 @@ create table respondents (
   cookie_token  uuid not null unique,        -- matches the httpOnly cookie, see section 6
   name          text not null,
   plus_one      boolean not null default false,
-  home_airport  text,                        -- 'SFO' | 'ORD' | 'MKE' | 'OTHER'
+  home_airport  text,                        -- 'SFO' | 'ORD' | 'MKE' | 'MSP'
   ski_level     text,                        -- 'beginner' | 'intermediate' | 'advanced'
   ski_days      int,                         -- 1, 2, or 3 — null if "already have a pass"
   already_has_pass boolean not null default false,
@@ -176,6 +176,7 @@ export const costAssumptions = {
     SFO: [180, 340],
     ORD: [160, 300],
     MKE: [150, 320],
+    MSP: [140, 290],
   },
   lodgingPerNightByDestination: {
     steamboat: [70, 130],       // per person, 4-6 to a condo
@@ -302,7 +303,7 @@ Everything below was accurate as of late August 2026 but is exactly the kind of 
 - Ikon Base Pass price (currently $1,019, climbs toward a December cutoff)
 - Ikon Session Pass pricing — 2-day is published at $319; the 1-day and 3-day figures in `costAssumptions.ts` are estimates and need to be confirmed against the day-selector at checkout on ikonpass.com
 - Steamboat 26/27 blackout dates (currently Dec 26–30, Jan 16–17, Feb 13–14 — same window applies to both Base and Session passes)
-- HDN winter flight roster (currently 18 airports including SFO and ORD, season runs Dec 10, 2026 – April 2027)
+- HDN winter flight roster (currently 18 airports including SFO, ORD and MSP but *not* MKE, season runs Dec 10, 2026 – April 2027)
 - Any hardcoded lodging/rental price ranges in `costAssumptions.ts` — these are placeholders, not quotes
 - Named restaurant/brewery/activity recommendations per destination — the current data files only have placeholder genre descriptions ("a brewery scene"); these need an actual research pass before they're useful to the group
 - Drive-time estimates from DEN (Steamboat ≈3h15, Summit County ≈1h45, Winter Park ≈1h20) are reasonable static figures for normal conditions but don't account for I-70 weekend ski traffic or storm closures — worth a caveat in the UI rather than presenting them as guaranteed
@@ -349,7 +350,7 @@ Phase 0 and Phase 1 are complete and live (see the commit history and CLAUDE.md)
 1. **No `/me` route.** `/` itself reads the identity cookie server-side and renders either the first-visit or "welcome back" state — matching Phase 1's single-page-scroll decision rather than introducing a second route. No redirect stub needed either.
 2. **Blackout dates are fully non-interactive on the availability grid**, not just visually flagged — they can't be set to available/maybe/unavailable at all. Correct the mockup's "Ikon blackout (Steamboat only)" legend copy: per Phase 1's `passInfo.ts`, the Session Pass blackout (Jan 16–17 and Feb 13–14, 2027) actually hits **both Steamboat and Winter Park**; Copper Mountain is unaffected on every Ikon tier.
 3. **Destination preference is one select control**, not a separate toggle — it feeds `destination_votes` (rank 1) and the cost section just displays the chosen destination's name as text, driving which numbers show. Full multi-destination ranking is deferred past Phase 2.
-4. **`home_airport` is exactly `'SFO' | 'ORD' | 'MKE'`** — drop the `'OTHER'` option from section 5's SQL comment; it's unused everywhere else (mockup, Phase 1 destination/airport data, cost calculator).
+4. **`home_airport` is a fixed list, with no `'OTHER'`** — drop the `'OTHER'` option from section 5's SQL comment; it's unused everywhere else (mockup, Phase 1 destination/airport data, cost calculator). *[Amended after Phase 2 merged: the list is `'SFO' | 'ORD' | 'MKE' | 'MSP'`. MSP was missed in the original planning pass. No migration was needed — `home_airport` is a `text` column whose allowed values live in the TypeScript union and the Zod enum, not in a Postgres enum or check constraint, so widening it is a code change only. Unlike MKE, MSP **is** on the HDN nonstop roster (Delta), so it gets the direct-to-Steamboat note in the flight card.]*
 5. **E2E tests get a real Postgres via a Docker/Postgres service container in CI**, not a second Supabase project — keeps production Supabase completely untouched by test runs. `DATABASE_URL` (when set) overrides the Supabase connection in the app's DB client, which is how local/CI test runs point elsewhere.
 6. **Pass-holders and the rental line**: when `already_has_pass` is true, `ski_days` is null (per the existing schema), so the rental line (only shown if `gear_status` is 'rental') assumes **2 ski days** for scaling purposes. This is a stated assumption, captioned visibly in the cost breakdown rather than silently baked in.
 7. **The respondent row (and autosave) isn't created on the first keystroke.** Intake has to be fully complete — name, plus-one choice, home airport, ski level, and email all filled in — before the first `POST` creates the row and autosave takes over. Trade-off, accepted explicitly: someone who fills in only part of intake and closes the tab loses that partial state, since nothing persisted yet. Acceptable given intake is a ~20-second, 5-field step.
