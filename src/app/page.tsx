@@ -1,21 +1,54 @@
+import { AvailabilityGrid } from "@/components/AvailabilityGrid";
 import { CostSection } from "@/components/CostSection";
 import { DestinationCard } from "@/components/DestinationCard";
+import { DestinationSelect } from "@/components/DestinationSelect";
 import { FlightCards } from "@/components/FlightCards";
 import { Footer } from "@/components/Footer";
 import { Hero } from "@/components/Hero";
+import { IntakeForm } from "@/components/IntakeForm";
+import { ResponseProvider } from "@/components/ResponseProvider";
+import { SaveBar } from "@/components/SaveBar";
 import { Section } from "@/components/Section";
 import { SourceLine } from "@/components/SourceLine";
+import { WelcomeBack } from "@/components/WelcomeBack";
 import { destinations } from "@/data/destinations";
 import { passInfo, passSources } from "@/data/passInfo";
+import { currentRespondent, loadClientResponse } from "@/lib/serverSession";
 
-export default function Home() {
+/**
+ * There's no /me route (section 16, decision 1). This page reads the identity
+ * cookie server-side and renders either the first-visit or the welcome-back
+ * state, which keeps Phase 1's single-page scroll intact.
+ *
+ * Reading the cookie makes the page dynamic. At this scale that's the right
+ * trade — the alternative is splitting the shell from the personalised parts
+ * to keep a static prerender that saves nothing measurable for a dozen guests.
+ */
+export default async function Home() {
+  const respondent = await currentRespondent();
+  const response = respondent ? await loadClientResponse(respondent) : null;
+
   return (
-    <>
+    <ResponseProvider initialResponse={response}>
       <Hero />
       <main className="max-w-[980px] mx-auto px-6 py-14">
         <Section
-          id="destinations"
+          id="you"
           number="01"
+          title={response ? "Your response" : "Start here"}
+          subtitle={
+            response
+              ? "Here's what you've told us so far. Change anything you like — it saves as you go."
+              : "Five quick questions, then the rest of the page tailors itself to your answers. Nothing here is a commitment."
+          }
+        >
+          {response && <WelcomeBack />}
+          <IntakeForm />
+        </Section>
+
+        <Section
+          id="destinations"
+          number="02"
           title="Where to go"
           subtitle="Skiing is one part of the weekend, not the whole point. Each option below is the mountain, the town, the food, and what else there is to do."
         >
@@ -24,18 +57,18 @@ export default function Home() {
               <DestinationCard key={destination.slug} destination={destination} />
             ))}
           </div>
+          <DestinationSelect />
         </Section>
 
         <Section
           id="dates"
-          number="02"
+          number="03"
           title="When to go"
           subtitle="Window is mid-January through mid-March 2027 — snow is typically most reliable in this stretch. (If it lines up, this window also happens to sit right around Ben's birthday — a nice bonus, not the driver.)"
         >
           <div className="bg-paper border border-line rounded-xl p-5">
             <p className="text-sm text-ink mb-2">
-              Most of the group will pick from this window once dates firm
-              up. One thing worth knowing ahead of time: the Ikon Session
+              One thing worth knowing before you mark days: the Ikon Session
               Pass — what most guests will actually buy — blacks out on{" "}
               <strong>January 16–17</strong> and <strong>February 13–14, 2027</strong>{" "}
               at both Steamboat and Winter Park. Copper Mountain has no
@@ -48,27 +81,43 @@ export default function Home() {
             </p>
             <SourceLine sources={passSources} />
           </div>
+
+          <div className="mt-4">
+            {response ? (
+              <AvailabilityGrid />
+            ) : (
+              <p className="text-sm text-ink-soft border border-line rounded-lg p-4">
+                Answer the questions up top and the calendar opens up here, so
+                you can mark the days that could work for you.
+              </p>
+            )}
+          </div>
         </Section>
 
         <Section
           id="getting-there"
-          number="03"
+          number="04"
           title="Getting there"
-          subtitle="Flight links for each home airport in the group — check current fares directly on Google Flights."
+          subtitle={
+            response
+              ? "Your home airport, and where to check current fares."
+              : "Flight links for each home airport in the group — check current fares directly on Google Flights."
+          }
         >
           <FlightCards />
         </Section>
 
         <Section
           id="costs"
-          number="04"
+          number="05"
           title="What it'll cost you"
-          subtitle="A rough per-person estimate, broken down by line item. Once everyone's told us their airport, ski days, and gear plans, this becomes personalized instead of an example."
+          subtitle="A rough per-person estimate, broken down by line item. Every figure here is a planning estimate, not a quote."
         >
           <CostSection />
         </Section>
       </main>
+      <SaveBar />
       <Footer />
-    </>
+    </ResponseProvider>
   );
 }
