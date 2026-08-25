@@ -1,6 +1,5 @@
 import type { Destination } from "@/data/types";
 import { formatUsdRange } from "@/lib/format";
-import { DestinationPreference } from "./DestinationPreference";
 import { DetailTile } from "./DetailTile";
 import { SourceLine } from "./SourceLine";
 
@@ -49,7 +48,6 @@ export function DestinationCard({ destination }: { destination: Destination }) {
       </div>
 
       <SourceLine sources={destination.sources} />
-      <DestinationPreference slug={destination.slug} />
     </div>
   );
 }

@@ -4,49 +4,65 @@ import type { DestinationSlug } from "@/data/types";
 export type TallyRow = {
   slug: DestinationSlug;
   name: string;
-  votes: number;
-  /** Share of finished responses, 0–1. */
+  /** How many people put this first. */
+  firstChoices: number;
+  /** Count at each rank: index 0 is 1st, index 1 is 2nd, and so on. */
+  placements: number[];
+  /** Mean rank across everyone who ranked it, or null if nobody has. */
+  averageRank: number | null;
+  /** First choices as a share of finished responses, 0–1. */
   share: number;
 };
 
 /**
- * Seeded from the destination list rather than from the votes, so a
- * destination nobody picked still appears at zero. "Nobody chose Winter Park"
- * is a finding; a Winter Park row silently missing from the table is just
- * confusing.
+ * Seeded from the destination list rather than from the rankings, so an option
+ * nobody put first still appears. "Nobody chose Winter Park" is a finding; a
+ * missing row is just confusing.
  *
- * The share denominator is everyone who finished, not everyone who voted.
- * Those are the same number for genuinely submitted responses —
- * `finishProblems()` requires a destination before anyone can finish — but the
- * share should describe the group rather than the subset that answered this
- * particular question.
+ * Ranking earns its keep here: a destination nobody puts first but everyone
+ * puts second is a real answer, and a single-pick tally couldn't express it.
+ * That's why placements and averageRank exist alongside the headline count.
  */
 export function tallyDestinations(
-  votes: { destinationSlug: DestinationSlug }[],
+  rankings: DestinationSlug[][],
   totalRespondents: number,
 ): TallyRow[] {
-  const counts = new Map<DestinationSlug, number>();
-  for (const vote of votes) {
-    // A vote for a slug that no longer exists is dropped rather than shown.
-    // The Zod enum should make this impossible; a stale row still shouldn't
-    // be able to break the dashboard.
-    if (destinations.some((d) => d.slug === vote.destinationSlug)) {
-      counts.set(vote.destinationSlug, (counts.get(vote.destinationSlug) ?? 0) + 1);
-    }
+  const rankCount = destinations.length;
+  const placements = new Map<DestinationSlug, number[]>(
+    destinations.map((d) => [d.slug, Array(rankCount).fill(0)]),
+  );
+
+  for (const ranking of rankings) {
+    ranking.forEach((slug, index) => {
+      // A slug that no longer exists, or a position past the known list, is
+      // dropped rather than rendered. The Zod schema should make both
+      // impossible; a stale row still shouldn't break the dashboard.
+      const counts = placements.get(slug);
+      if (counts && index < rankCount) counts[index] += 1;
+    });
   }
 
   return destinations
     .map((destination) => {
-      const count = counts.get(destination.slug) ?? 0;
+      const counts = placements.get(destination.slug) ?? Array(rankCount).fill(0);
+      const ranked = counts.reduce((sum, n) => sum + n, 0);
+      const rankSum = counts.reduce((sum, n, index) => sum + n * (index + 1), 0);
+
       return {
         slug: destination.slug,
         name: destination.name,
-        votes: count,
-        share: totalRespondents > 0 ? count / totalRespondents : 0,
+        firstChoices: counts[0],
+        placements: counts,
+        averageRank: ranked > 0 ? rankSum / ranked : null,
+        share: totalRespondents > 0 ? counts[0] / totalRespondents : 0,
       };
     })
-    // Array.prototype.sort is stable, so equal vote counts keep the order
-    // destinations are declared in — the table shouldn't reshuffle between
-    // renders just because two options are tied.
-    .sort((a, b) => b.votes - a.votes);
+    .sort((a, b) => {
+      if (b.firstChoices !== a.firstChoices) return b.firstChoices - a.firstChoices;
+      // Level on first choices: the one the group likes better overall wins.
+      // A consensus second choice should outrank a polarising one.
+      const aRank = a.averageRank ?? Number.POSITIVE_INFINITY;
+      const bRank = b.averageRank ?? Number.POSITIVE_INFINITY;
+      return aRank - bRank;
+    });
 }

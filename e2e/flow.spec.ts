@@ -77,9 +77,12 @@ test("the destination choice saves and drives the cost table", async ({ page }) 
   await pickDestination(page, "winterPark");
   await expect(page.getByText(/estimated for/i)).toBeVisible();
 
+  // A full ranking is stored now, not a single pick — rank 1 is what the cost
+  // estimate follows.
   await expect
-    .poll(destinationVotes)
-    .toEqual([{ destination_slug: "winterPark", rank: 1 }]);
+    .poll(async () => (await destinationVotes()).find((v) => v.rank === 1))
+    .toEqual({ destination_slug: "winterPark", rank: 1 });
+  expect(await destinationVotes()).toHaveLength(3);
 
   await expect(page.getByText(/Winter Park/).first()).toBeVisible();
   await expect(page.getByText("Flight, round trip (ORD)")).toBeVisible();
@@ -218,7 +221,9 @@ test("save & finish refuses an incomplete answer, then accepts a complete one", 
   await page.getByRole("button", { name: /save & finish/i }).click();
 
   await expect(page.locator(".sticky").getByRole("alert")).toContainText(/still need an answer/i);
-  await expect(page.locator(".sticky").getByRole("alert")).toContainText(/pick which destination/i);
+  await expect(page.locator(".sticky").getByRole("alert")).toContainText(
+    /order you.d prefer them/i,
+  );
   await expect(page.locator(".sticky").getByRole("alert")).toContainText(/at least one day/i);
   expect((await onlyRespondent()).submitted_at).toBeNull();
 

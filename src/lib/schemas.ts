@@ -8,8 +8,22 @@ export const skiLevelSchema = z.enum(["beginner", "intermediate", "advanced"], {
   message: "Let us know roughly how comfortable you are on snow",
 });
 export const gearStatusSchema = z.enum(["own", "rental"]);
-export const destinationSlugSchema = z.enum(["steamboat", "summitCounty", "winterPark"]);
+export const DESTINATION_SLUGS = ["steamboat", "summitCounty", "winterPark"] as const;
+export const destinationSlugSchema = z.enum(DESTINATION_SLUGS);
 export const availabilityStatusSchema = z.enum(["available", "maybe", "unavailable"]);
+
+/**
+ * A complete ordering of every destination, best first. Complete on purpose:
+ * a partial ranking leaves it ambiguous whether an absent destination was
+ * ranked last or simply never considered.
+ */
+export const destinationRankingSchema = z
+  .array(destinationSlugSchema)
+  .length(DESTINATION_SLUGS.length)
+  .refine(
+    (slugs) => new Set(slugs).size === slugs.length,
+    "Each destination can only appear once in the ranking",
+  );
 
 /** 1, 2 or 3 — this group isn't buying a 4-day (PLAN.md section 8). */
 export const skiDaysSchema = z.union([z.literal(1), z.literal(2), z.literal(3)]);
@@ -59,8 +73,8 @@ export const respondentPatchSchema = z
     plusOneGearStatus: gearStatusSchema,
 
     notes: z.string().max(2000),
-    // Nullable so a pick can be taken back, not only changed.
-    destinationSlug: destinationSlugSchema.nullable(),
+    // Nullable so a ranking can be taken back, not only reordered.
+    destinationRanking: destinationRankingSchema.nullable(),
   })
   .partial();
 

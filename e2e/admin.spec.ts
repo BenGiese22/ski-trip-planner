@@ -189,10 +189,11 @@ test("the tally lists every destination, including ones nobody picked", async ({
 
   await signIn(page);
 
-  // The chosen one shows its count and share...
-  await expect(page.getByText(/1 vote · 100%/)).toBeVisible();
-  // ...and the two nobody picked are still listed at zero, rather than
-  // vanishing from the table.
-  await expect(page.getByText("0 votes")).toHaveCount(2);
+  // The top-ranked one shows its count and share...
+  await expect(page.getByText(/1 first choice · 100%/)).toBeVisible();
+  // ...and the two nobody put first are still listed, rather than vanishing.
+  await expect(page.getByText(/0 first choices/)).toHaveCount(2);
   await expect(page.getByText("Winter Park", { exact: true })).toBeVisible();
+  // Ranking's payoff: the full spread, not just the headline count.
+  await expect(page.getByText(/average rank/).first()).toBeVisible();
 });

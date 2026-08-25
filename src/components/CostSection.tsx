@@ -70,7 +70,8 @@ function PersonalisedCosts() {
   const { response } = useResponse();
   if (!response) return null;
 
-  const destination = destinations.find((d) => d.slug === response.destinationSlug);
+  // The cost estimate follows whatever they ranked first.
+  const destination = destinations.find((d) => d.slug === response.destinationRanking[0]);
 
   return (
     <>
@@ -84,8 +85,8 @@ function PersonalisedCosts() {
 
       {!destination ? (
         <p className="text-sm text-ink-soft border border-line rounded-lg p-4">
-          Pick a destination up in &ldquo;Where to go&rdquo; and this becomes
-          your own estimate rather than an example.
+          Rank the destinations up in &ldquo;Where to go&rdquo; and this
+          becomes your own estimate rather than an example.
         </p>
       ) : (
         <Breakdown destinationName={destination.name} destinationSlug={destination.slug} />

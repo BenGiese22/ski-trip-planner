@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { getAvailability, getDestinationVote, findRespondentByToken } from "@/db/queries";
+import { getAvailability, getDestinationRanking, findRespondentByToken } from "@/db/queries";
 import type { Respondent } from "@/db/schema";
 import type { DestinationSlug } from "@/data/types";
 import type { AvailabilityStatus } from "@/db/schema";
@@ -26,13 +26,14 @@ export type ClientResponse = {
   plusOneGearStatus: Respondent["plusOneGearStatus"];
   notes: string | null;
   submittedAt: string | null;
-  destinationSlug: DestinationSlug | null;
+  /** Best first. Empty when this person hasn't ranked anything yet. */
+  destinationRanking: DestinationSlug[];
   availability: { date: string; status: AvailabilityStatus }[];
 };
 
 export function toClientResponse(
   respondent: Respondent,
-  destinationSlug: DestinationSlug | null,
+  destinationRanking: DestinationSlug[],
   availability: { date: string; status: AvailabilityStatus }[],
 ): ClientResponse {
   return {
@@ -49,7 +50,7 @@ export function toClientResponse(
     plusOneGearStatus: respondent.plusOneGearStatus,
     notes: respondent.notes,
     submittedAt: respondent.submittedAt?.toISOString() ?? null,
-    destinationSlug,
+    destinationRanking,
     availability,
   };
 }
@@ -65,14 +66,14 @@ export async function currentRespondent(): Promise<Respondent | null> {
 export async function loadClientResponse(
   respondent: Respondent,
 ): Promise<ClientResponse> {
-  const [destinationSlug, availabilityRows] = await Promise.all([
-    getDestinationVote(respondent.id),
+  const [destinationRanking, availabilityRows] = await Promise.all([
+    getDestinationRanking(respondent.id),
     getAvailability(respondent.id),
   ]);
 
   return toClientResponse(
     respondent,
-    destinationSlug,
+    destinationRanking,
     availabilityRows.map((row) => ({ date: row.date, status: row.status })),
   );
 }

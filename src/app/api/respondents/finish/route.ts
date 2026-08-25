@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAvailability, getDestinationVote, markSubmitted } from "@/db/queries";
+import { getAvailability, getDestinationRanking, markSubmitted } from "@/db/queries";
 import { noSuchRespondent } from "@/lib/api";
 import { finishProblems } from "@/lib/finish";
 import { currentRespondent, loadClientResponse } from "@/lib/serverSession";
@@ -17,14 +17,14 @@ export async function POST() {
   const respondent = await currentRespondent();
   if (!respondent) return noSuchRespondent();
 
-  const [destinationSlug, availabilityRows] = await Promise.all([
-    getDestinationVote(respondent.id),
+  const [destinationRanking, availabilityRows] = await Promise.all([
+    getDestinationRanking(respondent.id),
     getAvailability(respondent.id),
   ]);
 
   const problems = finishProblems(respondent, {
-    destinationSlug,
-    availableDayCount: availabilityRows.filter((row) => row.status !== "unavailable")
+    destinationRanking,
+    availableDayCount: availabilityRows.filter((row: { status: string }) => row.status !== "unavailable")
       .length,
   });
 

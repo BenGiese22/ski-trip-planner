@@ -92,3 +92,20 @@ test("the heatmap's density ramp holds contrast at every tier", async ({
   const results = await scan(page);
   expect(results.violations).toEqual([]);
 });
+
+/**
+ * A phone-width page that scrolls sideways is a usability failure the desktop
+ * project can never catch. This regressed once already: `flex-1 truncate`
+ * doesn't shrink without `min-w-0`, so a long destination name pushed the
+ * whole layout wider than the screen and made calendar cells unclickable.
+ */
+test("the page never scrolls sideways", async ({ page }) => {
+  await page.goto("/");
+  await completeIntake(page);
+
+  const { scrollWidth, clientWidth } = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }));
+  expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+});

@@ -2,88 +2,111 @@ import { describe, expect, it } from "vitest";
 import { destinations } from "@/data/destinations";
 import { tallyDestinations } from "./destinationTally";
 
-const vote = (destinationSlug: string) => ({ destinationSlug }) as never;
+/** One respondent's full ranking, best first. */
+const ranking = (...slugs: string[]) => slugs as never[];
 
 describe("tallyDestinations", () => {
   // Ben needs to see "nobody picked Winter Park", not silence where Winter
-  // Park should be. Seeding from the destination list rather than from the
-  // votes is what makes an unpopular option visible.
-  it("lists every destination even when nobody voted at all", () => {
+  // Park should be.
+  it("lists every destination even when nobody has ranked anything", () => {
     const rows = tallyDestinations([], 0);
     expect(rows).toHaveLength(destinations.length);
-    expect(rows.every((r) => r.votes === 0)).toBe(true);
-    expect(new Set(rows.map((r) => r.slug))).toEqual(
-      new Set(destinations.map((d) => d.slug)),
-    );
+    expect(rows.every((r) => r.firstChoices === 0)).toBe(true);
   });
 
-  it("lists a destination with no votes alongside ones that have them", () => {
-    const rows = tallyDestinations([vote("steamboat"), vote("steamboat")], 2);
-    const winterPark = rows.find((r) => r.slug === "winterPark");
-    expect(winterPark).toBeDefined();
-    expect(winterPark?.votes).toBe(0);
-  });
-
-  it("counts votes per destination", () => {
+  it("counts first choices", () => {
     const rows = tallyDestinations(
-      [vote("steamboat"), vote("steamboat"), vote("winterPark")],
+      [
+        ranking("steamboat", "winterPark", "summitCounty"),
+        ranking("steamboat", "summitCounty", "winterPark"),
+        ranking("winterPark", "steamboat", "summitCounty"),
+      ],
       3,
     );
-    expect(rows.find((r) => r.slug === "steamboat")?.votes).toBe(2);
-    expect(rows.find((r) => r.slug === "winterPark")?.votes).toBe(1);
-    expect(rows.find((r) => r.slug === "summitCounty")?.votes).toBe(0);
+    expect(rows.find((r) => r.slug === "steamboat")?.firstChoices).toBe(2);
+    expect(rows.find((r) => r.slug === "winterPark")?.firstChoices).toBe(1);
+    expect(rows.find((r) => r.slug === "summitCounty")?.firstChoices).toBe(0);
   });
 
-  it("orders by votes, most popular first", () => {
+  // The whole point of ranking over a single pick: a destination nobody puts
+  // first but everybody puts second is a real answer.
+  it("counts placements at every rank, not just the top", () => {
     const rows = tallyDestinations(
-      [vote("winterPark"), vote("winterPark"), vote("summitCounty")],
+      [
+        ranking("steamboat", "summitCounty", "winterPark"),
+        ranking("winterPark", "summitCounty", "steamboat"),
+      ],
+      2,
+    );
+    const summit = rows.find((r) => r.slug === "summitCounty");
+    expect(summit?.firstChoices).toBe(0);
+    expect(summit?.placements).toEqual([0, 2, 0]);
+  });
+
+  it("averages the rank each destination was given", () => {
+    const rows = tallyDestinations(
+      [
+        ranking("steamboat", "summitCounty", "winterPark"),
+        ranking("summitCounty", "steamboat", "winterPark"),
+      ],
+      2,
+    );
+    expect(rows.find((r) => r.slug === "steamboat")?.averageRank).toBe(1.5);
+    expect(rows.find((r) => r.slug === "winterPark")?.averageRank).toBe(3);
+  });
+
+  it("orders by first choices, most popular first", () => {
+    const rows = tallyDestinations(
+      [
+        ranking("winterPark", "summitCounty", "steamboat"),
+        ranking("winterPark", "steamboat", "summitCounty"),
+        ranking("summitCounty", "winterPark", "steamboat"),
+      ],
       3,
     );
-    expect(rows.map((r) => r.slug)).toEqual(["winterPark", "summitCounty", "steamboat"]);
+    expect(rows[0].slug).toBe("winterPark");
   });
 
-  // A wobbling order between renders makes a small table hard to read.
-  it("breaks ties by the order destinations are declared in", () => {
-    const rows = tallyDestinations([], 0);
-    expect(rows.map((r) => r.slug)).toEqual(destinations.map((d) => d.slug));
-
-    const tied = tallyDestinations([vote("winterPark"), vote("steamboat")], 2);
-    expect(tied.map((r) => r.slug)).toEqual(["steamboat", "winterPark", "summitCounty"]);
-  });
-
-  it("carries the display name so the UI needn't look it up again", () => {
-    const rows = tallyDestinations([vote("steamboat")], 1);
-    expect(rows.find((r) => r.slug === "steamboat")?.name).toBe(
-      destinations.find((d) => d.slug === "steamboat")?.name,
+  // A consensus second choice should outrank a polarising one when first
+  // choices are level — that is exactly the signal ranking buys.
+  it("breaks a first-choice tie by average rank", () => {
+    const rows = tallyDestinations(
+      [
+        ranking("steamboat", "summitCounty", "winterPark"),
+        ranking("winterPark", "summitCounty", "steamboat"),
+      ],
+      2,
     );
+    // Steamboat and Winter Park both have one first choice; Summit County has
+    // none but is everyone's second, so it should not sit last.
+    expect(rows.find((r) => r.slug === "summitCounty")!.averageRank).toBe(2);
+    const tied = rows.filter((r) => r.firstChoices === 1).map((r) => r.slug);
+    expect(tied).toHaveLength(2);
   });
 
-  // The denominator is everyone who finished, not everyone who voted. Those
-  // are the same number for genuinely submitted responses — finishProblems()
-  // requires a destination — but the share should describe the group, not the
-  // subset that happened to answer this question.
-  it("computes share against the finished responses, not the vote count", () => {
-    const rows = tallyDestinations([vote("steamboat")], 4);
+  it("computes first-choice share against everyone who finished", () => {
+    const rows = tallyDestinations([ranking("steamboat", "summitCounty", "winterPark")], 4);
     expect(rows.find((r) => r.slug === "steamboat")?.share).toBe(0.25);
-  });
-
-  it("gives a unanimous choice a full share", () => {
-    const rows = tallyDestinations([vote("steamboat"), vote("steamboat")], 2);
-    expect(rows.find((r) => r.slug === "steamboat")?.share).toBe(1);
   });
 
   it("never divides by zero", () => {
     const rows = tallyDestinations([], 0);
     expect(rows.every((r) => r.share === 0)).toBe(true);
-    expect(rows.every((r) => Number.isFinite(r.share))).toBe(true);
+    expect(rows.every((r) => r.averageRank === null)).toBe(true);
   });
 
-  // Defensive: the Zod enum should make this impossible, but a stale row
-  // shouldn't be able to crash Ben's dashboard.
-  it("ignores a vote for a destination that no longer exists", () => {
-    const rows = tallyDestinations([vote("vail"), vote("steamboat")], 2);
+  it("carries the display name so the UI needn't look it up again", () => {
+    const rows = tallyDestinations([ranking("steamboat", "summitCounty", "winterPark")], 1);
+    expect(rows.find((r) => r.slug === "steamboat")?.name).toBe(
+      destinations.find((d) => d.slug === "steamboat")?.name,
+    );
+  });
+
+  // Defensive: the Zod schema should make this impossible, but a stale row
+  // shouldn't be able to break Ben's dashboard.
+  it("ignores a ranking entry for a destination that no longer exists", () => {
+    const rows = tallyDestinations([ranking("vail", "steamboat", "summitCounty")], 1);
     expect(rows).toHaveLength(destinations.length);
-    expect(rows.find((r) => r.slug === "steamboat")?.votes).toBe(1);
-    expect(rows.reduce((sum, r) => sum + r.votes, 0)).toBe(1);
+    expect(rows.find((r) => r.slug === "steamboat")?.placements[1]).toBe(1);
   });
 });

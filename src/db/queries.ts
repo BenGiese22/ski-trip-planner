@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, lt, sql } from "drizzle-orm";
+import { eq, isNotNull, lt, sql } from "drizzle-orm";
 import type { DestinationSlug } from "@/data/types";
 import type { DayCount } from "@/lib/availabilityHeatmap";
 import type { AvailabilityBulkInput, IntakeInput, RespondentPatch } from "@/lib/schemas";
@@ -49,14 +49,14 @@ export async function updateRespondent(
   respondent: Respondent,
   patch: RespondentPatch,
 ): Promise<Respondent> {
-  const { destinationSlug, ...columns } = patch;
+  const { destinationRanking, ...columns } = patch;
   const db = getDb();
 
-  // `undefined` means the patch didn't mention it; `null` means take the pick
-  // back. Only the latter should clear the stored vote.
-  if (destinationSlug !== undefined) {
-    if (destinationSlug === null) await clearDestinationVote(respondent.id);
-    else await setDestinationVote(respondent.id, destinationSlug);
+  // `undefined` means the patch didn't mention it; `null` means take the
+  // ranking back. Only the latter should clear the stored rows.
+  if (destinationRanking !== undefined) {
+    if (destinationRanking === null) await clearDestinationVote(respondent.id);
+    else await setDestinationRanking(respondent.id, destinationRanking);
   }
 
   if (Object.keys(columns).length === 0) {
@@ -82,15 +82,25 @@ export async function markSubmitted(respondent: Respondent): Promise<Respondent>
   return row;
 }
 
-export async function setDestinationVote(
+/**
+ * Writes one row per destination, ranked best first. Replace-all rather than
+ * upsert: a reorder changes several rows at once, and rewriting the set is
+ * both simpler and impossible to leave half-applied.
+ */
+export async function setDestinationRanking(
   respondentId: string,
-  destinationSlug: DestinationSlug,
+  ranking: DestinationSlug[],
 ): Promise<void> {
-  const db = getDb();
-  // One choice at a time in Phase 2, so clear any previous pick rather than
-  // accumulating a second rank-1 row for a different destination.
-  await db.delete(destinationVotes).where(eq(destinationVotes.respondentId, respondentId));
-  await db.insert(destinationVotes).values({ respondentId, destinationSlug, rank: 1 });
+  await getDb().transaction(async (tx) => {
+    await tx.delete(destinationVotes).where(eq(destinationVotes.respondentId, respondentId));
+    await tx.insert(destinationVotes).values(
+      ranking.map((destinationSlug, index) => ({
+        respondentId,
+        destinationSlug,
+        rank: index + 1,
+      })),
+    );
+  });
 }
 
 export async function clearDestinationVote(respondentId: string): Promise<void> {
@@ -99,17 +109,16 @@ export async function clearDestinationVote(respondentId: string): Promise<void> 
     .where(eq(destinationVotes.respondentId, respondentId));
 }
 
-export async function getDestinationVote(
+/** Best first, or an empty array if this person hasn't ranked anything. */
+export async function getDestinationRanking(
   respondentId: string,
-): Promise<DestinationSlug | null> {
+): Promise<DestinationSlug[]> {
   const rows = await getDb()
-    .select()
+    .select({ destinationSlug: destinationVotes.destinationSlug, rank: destinationVotes.rank })
     .from(destinationVotes)
-    .where(
-      and(eq(destinationVotes.respondentId, respondentId), eq(destinationVotes.rank, 1)),
-    )
-    .limit(1);
-  return rows[0]?.destinationSlug ?? null;
+    .where(eq(destinationVotes.respondentId, respondentId))
+    .orderBy(destinationVotes.rank);
+  return rows.map((row) => row.destinationSlug);
 }
 
 export async function getAvailability(respondentId: string): Promise<AvailabilityRow[]> {
@@ -218,13 +227,28 @@ export async function availabilityCountsByDate(): Promise<DayCount[]> {
   return [...byDate.values()];
 }
 
-/** Rank-1 votes from finished responses only (§17 decision 3). */
-export async function listSubmittedDestinationVotes(): Promise<
-  { destinationSlug: DestinationSlug }[]
-> {
-  return getDb()
-    .select({ destinationSlug: destinationVotes.destinationSlug })
+/**
+ * Every finished respondent's full ranking, best first (§17 decision 3).
+ * Grouped in TypeScript rather than SQL: at this scale it's a handful of rows,
+ * and the shape the tally wants is an array per person.
+ */
+export async function listSubmittedDestinationRankings(): Promise<DestinationSlug[][]> {
+  const rows = await getDb()
+    .select({
+      respondentId: destinationVotes.respondentId,
+      destinationSlug: destinationVotes.destinationSlug,
+      rank: destinationVotes.rank,
+    })
     .from(destinationVotes)
     .innerJoin(respondents, eq(destinationVotes.respondentId, respondents.id))
-    .where(and(eq(destinationVotes.rank, 1), isNotNull(respondents.submittedAt)));
+    .where(isNotNull(respondents.submittedAt))
+    .orderBy(destinationVotes.respondentId, destinationVotes.rank);
+
+  const byRespondent = new Map<string, DestinationSlug[]>();
+  for (const row of rows) {
+    const list = byRespondent.get(row.respondentId) ?? [];
+    list.push(row.destinationSlug);
+    byRespondent.set(row.respondentId, list);
+  }
+  return [...byRespondent.values()];
 }

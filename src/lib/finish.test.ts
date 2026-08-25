@@ -26,7 +26,7 @@ function respondent(overrides: Partial<Respondent> = {}): Respondent {
 }
 
 const complete = {
-  destinationSlug: "summitCounty" as const,
+  destinationRanking: ["summitCounty", "steamboat", "winterPark"] as string[] as never,
   availableDayCount: 4,
 };
 
@@ -37,12 +37,12 @@ describe("finishProblems", () => {
     expect(finishProblems(respondent(), complete)).toEqual([]);
   });
 
-  it("asks for a destination preference when none is chosen", () => {
+  it("asks for a ranking when the destinations are untouched", () => {
     const problems = finishProblems(respondent(), {
       ...complete,
-      destinationSlug: null,
+      destinationRanking: [],
     });
-    expect(fieldsOf(problems)).toContain("destinationSlug");
+    expect(fieldsOf(problems)).toContain("destinationRanking");
   });
 
   it("asks for at least one day when the calendar is untouched", () => {
@@ -120,12 +120,12 @@ describe("finishProblems", () => {
   it("reports every problem at once rather than one at a time", () => {
     const problems = finishProblems(
       respondent({ skiDays: null, gearStatus: null, plusOne: true }),
-      { destinationSlug: null, availableDayCount: 0 },
+      { destinationRanking: [], availableDayCount: 0 },
     );
     expect(fieldsOf(problems).sort()).toEqual(
       [
         "availability",
-        "destinationSlug",
+        "destinationRanking",
         "gearStatus",
         "plusOneGearStatus",
         "plusOneSkiDays",
@@ -136,7 +136,7 @@ describe("finishProblems", () => {
 
   it("gives every problem a message worth showing a person", () => {
     const problems = finishProblems(respondent({ skiDays: null, gearStatus: null }), {
-      destinationSlug: null,
+      destinationRanking: [],
       availableDayCount: 0,
     });
     for (const problem of problems) {

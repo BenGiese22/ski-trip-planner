@@ -6,7 +6,7 @@ import { AdminLogoutButton } from "@/components/AdminLogoutButton";
 import {
   availabilityCountsByDate,
   countSubmittedRespondents,
-  listSubmittedDestinationVotes,
+  listSubmittedDestinationRankings,
 } from "@/db/queries";
 import { isAdminAuthenticated } from "@/lib/adminServerSession";
 import { buildHeatmap } from "@/lib/availabilityHeatmap";
@@ -54,10 +54,10 @@ export default async function AdminPage() {
 }
 
 async function AdminDashboard() {
-  const [totalRespondents, counts, votes] = await Promise.all([
+  const [totalRespondents, counts, rankings] = await Promise.all([
     countSubmittedRespondents(),
     availabilityCountsByDate(),
-    listSubmittedDestinationVotes(),
+    listSubmittedDestinationRankings(),
   ]);
 
   return (
@@ -89,14 +89,14 @@ async function AdminDashboard() {
       <section className="mb-10">
         <h2 className="text-xl mb-1.5">Where they&rsquo;d rather go</h2>
         <p className="text-sm text-ink-soft max-w-[60ch] mb-4">
-          Every option is listed, including any nobody has picked.
+          Ranked best-first by each person. Every option is listed, including any nobody put first.
         </p>
         {totalRespondents === 0 ? (
           <p className="text-sm text-ink-soft border border-line rounded-lg p-4">
             No preferences yet.
           </p>
         ) : (
-          <AdminDestinationTally rows={tallyDestinations(votes, totalRespondents)} />
+          <AdminDestinationTally rows={tallyDestinations(rankings, totalRespondents)} />
         )}
       </section>
     </div>

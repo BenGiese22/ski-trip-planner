@@ -28,9 +28,7 @@ test("a returning visitor's answers are still there after a reload", async ({ pa
   await expect(page.getByLabel("Your name")).toHaveValue("Jamie Rivera");
   await expect(page.getByLabel("Email")).toHaveValue("jamie@example.com");
   await expect(page.getByLabel("Home airport")).toHaveValue("ORD");
-  await expect(
-    page.getByTestId("destination-steamboat").getByRole("button", { name: /this is my pick/i }),
-  ).toBeVisible();
+  await expect(page.getByTestId("rank-badge-steamboat")).toHaveText("1st choice");
   await expect(dayCell(page, "Thursday, January 28")).toHaveAccessibleName(/available$/);
 
   // Still one row — a revisit edits rather than starting over.

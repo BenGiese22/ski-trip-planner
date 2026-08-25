@@ -1,6 +1,6 @@
 import { AvailabilityGrid } from "@/components/AvailabilityGrid";
 import { CostSection } from "@/components/CostSection";
-import { DestinationCard } from "@/components/DestinationCard";
+import { DestinationRanker } from "@/components/DestinationRanker";
 import { FlightCards } from "@/components/FlightCards";
 import { Footer } from "@/components/Footer";
 import { Hero } from "@/components/Hero";
@@ -10,7 +10,6 @@ import { SaveBar } from "@/components/SaveBar";
 import { Section } from "@/components/Section";
 import { SourceLine } from "@/components/SourceLine";
 import { WelcomeBack } from "@/components/WelcomeBack";
-import { destinations } from "@/data/destinations";
 import { passInfo, passSources } from "@/data/passInfo";
 import { currentRespondent, loadClientResponse } from "@/lib/serverSession";
 
@@ -30,7 +29,7 @@ export default async function Home() {
   return (
     <ResponseProvider initialResponse={response}>
       <Hero />
-      <main className="max-w-[980px] mx-auto px-6 py-14">
+      <main className="w-full min-w-0 max-w-[980px] mx-auto px-6 py-14">
         <Section
           id="you"
           number="01"
@@ -45,13 +44,9 @@ export default async function Home() {
           id="destinations"
           number="02"
           title="Where to go"
-          subtitle="Skiing is one part of the weekend, not the whole point. Each option below is the mountain, the town, the food, and what else there is to do. Tell us which you'd prefer on the card itself — it isn't a vote that binds anyone, it just shows Ben where the group leans and tailors the cost estimate further down."
+          subtitle="Skiing is one part of the weekend, not the whole point. Each option below is the mountain, the town, the food, and what else there is to do."
         >
-          <div className="flex flex-col gap-3.5">
-            {destinations.map((destination) => (
-              <DestinationCard key={destination.slug} destination={destination} />
-            ))}
-          </div>
+          <DestinationRanker />
         </Section>
 
         <Section

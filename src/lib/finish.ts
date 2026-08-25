@@ -7,7 +7,8 @@ export type FinishProblem = {
 };
 
 export type FinishContext = {
-  destinationSlug: DestinationSlug | null;
+  /** Best first; empty means they haven't ranked the destinations yet. */
+  destinationRanking: DestinationSlug[];
   availableDayCount: number;
 };
 
@@ -22,14 +23,14 @@ export type FinishContext = {
  */
 export function finishProblems(
   respondent: Respondent,
-  { destinationSlug, availableDayCount }: FinishContext,
+  { destinationRanking, availableDayCount }: FinishContext,
 ): FinishProblem[] {
   const problems: FinishProblem[] = [];
 
-  if (!destinationSlug) {
+  if (destinationRanking.length === 0) {
     problems.push({
-      field: "destinationSlug",
-      message: "Pick which destination you'd prefer.",
+      field: "destinationRanking",
+      message: "Put the destinations in the order you'd prefer them.",
     });
   }
 

@@ -128,17 +128,47 @@ describe("respondentPatchSchema", () => {
     );
   });
 
-  it("accepts a null destination, which is how a pick is taken back", () => {
-    expect(respondentPatchSchema.safeParse({ destinationSlug: null }).success).toBe(true);
+  it("accepts a full ranking of every destination", () => {
+    expect(
+      respondentPatchSchema.safeParse({
+        destinationRanking: ["winterPark", "steamboat", "summitCounty"],
+      }).success,
+    ).toBe(true);
   });
 
-  it("validates the destination preference against the known slugs", () => {
-    expect(respondentPatchSchema.safeParse({ destinationSlug: "steamboat" }).success).toBe(
+  it("accepts a null ranking, which is how a ranking is taken back", () => {
+    expect(respondentPatchSchema.safeParse({ destinationRanking: null }).success).toBe(
       true,
     );
-    expect(respondentPatchSchema.safeParse({ destinationSlug: "vail" }).success).toBe(
-      false,
-    );
+  });
+
+  // A partial ranking would leave it ambiguous whether an absent destination
+  // was ranked last or simply not considered.
+  it("rejects a ranking that omits a destination", () => {
+    expect(
+      respondentPatchSchema.safeParse({ destinationRanking: ["steamboat"] }).success,
+    ).toBe(false);
+    expect(
+      respondentPatchSchema.safeParse({
+        destinationRanking: ["steamboat", "winterPark"],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects a ranking with the same destination twice", () => {
+    expect(
+      respondentPatchSchema.safeParse({
+        destinationRanking: ["steamboat", "steamboat", "winterPark"],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects a ranking containing an unknown destination", () => {
+    expect(
+      respondentPatchSchema.safeParse({
+        destinationRanking: ["steamboat", "winterPark", "vail"],
+      }).success,
+    ).toBe(false);
   });
 });
 

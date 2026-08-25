@@ -19,7 +19,7 @@ function response(overrides: Partial<ClientResponse> = {}): ClientResponse {
     plusOneGearStatus: null,
     notes: null,
     submittedAt: null,
-    destinationSlug: null,
+    destinationRanking: [],
     availability: [],
     ...overrides,
   };

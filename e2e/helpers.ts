@@ -1,5 +1,6 @@
 import postgres from "postgres";
 import { expect, type Page } from "@playwright/test";
+import { destinations } from "../src/data/destinations";
 import { databaseUrl } from "./database";
 
 /**
@@ -95,15 +96,29 @@ export function dayCell(page: Page, label: string) {
 }
 
 /**
- * The destination preference now lives on each card as a toggle rather than in
- * a dropdown, so choosing is scoped to the card.
+ * Destinations are ranked rather than picked. Drives the up button — the
+ * keyboard-accessible path — until the named destination sits first, which is
+ * what the cost estimate follows.
  */
 export async function pickDestination(page: Page, slug: string) {
-  await page
-    .getByTestId(`destination-${slug}`)
-    .getByRole("button", { name: /prefer this one/i })
-    .click();
-  await expect(
-    page.getByTestId(`destination-${slug}`).getByRole("button", { name: /this is my pick/i }),
-  ).toBeVisible();
+  // The real display names are long ("Summit County — Frisco, Dillon,
+  // Silverthorne"), so match the aria-label loosely rather than assuming a
+  // short name — a too-strict regex silently matched nothing and fell through
+  // to accepting the default order.
+  const name = destinations.find((d) => d.slug === slug)!.name;
+  for (let i = 0; i < 4; i++) {
+    const up = page.getByRole("button", { name: `Move ${name} up`, exact: false });
+    if (!(await up.isVisible()) || !(await up.isEnabled())) break;
+    await up.click();
+  }
+
+  // Already top of the default order: nothing moved, so nothing was committed.
+  // Accepting the order explicitly is how a real user expresses the same thing.
+  const accept = page.getByRole("button", { name: /this order works for me/i });
+  if (await accept.isVisible()) await accept.click();
+  // Assert via the rank badge, not list position: the destination cards
+  // contain their own <li> bullets, so getByRole("listitem") matches those too.
+  await expect(page.getByTestId(`rank-badge-${slug}`)).toHaveText("1st choice");
 }
+
+

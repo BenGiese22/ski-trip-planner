@@ -85,8 +85,19 @@ export function ResponseProvider({
   const update = useCallback(
     (patch: RespondentPatch, { immediate = false }: { immediate?: boolean } = {}) => {
       // Reflect the change straight away so the cost table and grid don't wait
-      // on a round trip to redraw.
-      setResponse((current) => (current ? { ...current, ...patch } : current));
+      // on a round trip to redraw. A null ranking means "cleared", which the
+      // client shape represents as an empty array rather than null.
+      setResponse((current) => {
+        if (!current) return current;
+        const { destinationRanking, ...columns } = patch;
+        return {
+          ...current,
+          ...columns,
+          ...(destinationRanking !== undefined
+            ? { destinationRanking: destinationRanking ?? [] }
+            : {}),
+        };
+      });
       fields.queue(patch);
       if (immediate) void fields.flush();
     },
