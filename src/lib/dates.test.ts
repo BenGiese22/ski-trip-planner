@@ -5,6 +5,8 @@ import {
   buildMonthGrids,
   datesInRange,
   eachDateInWindow,
+  blackoutDestinationNames,
+  isBlackoutAnywhere,
   isBlackoutDate,
   isInWindow,
   quickPicks,
@@ -119,23 +121,32 @@ describe("blackout dates", () => {
     expect(isBlackoutDate("2027-02-15", "winterPark")).toBe(false);
   });
 
-  it("marks blackout cells on the grid for the chosen destination only", () => {
-    const steamboat = buildMonthGrids("steamboat").flatMap((g) =>
+  // Availability and destination preference are separate questions, so the
+  // grid flags blackout days the same way regardless of what anyone picked.
+  // Gating one on the other also trapped data: a day marked before choosing
+  // Steamboat became unclearable.
+  it("marks blackout days the same regardless of destination", () => {
+    const marked = buildMonthGrids().flatMap((g) =>
       g.cells.filter((c) => c.kind === "day" && c.isBlackout),
     );
-    expect(steamboat).toHaveLength(4);
-
-    const summit = buildMonthGrids("summitCounty").flatMap((g) =>
-      g.cells.filter((c) => c.kind === "day" && c.isBlackout),
-    );
-    expect(summit).toHaveLength(0);
+    expect(marked).toHaveLength(4);
+    expect(
+      marked.map((c) => (c.kind === "day" ? c.date : "")).sort(),
+    ).toEqual(["2027-01-16", "2027-01-17", "2027-02-13", "2027-02-14"]);
   });
 
-  it("marks no blackouts when no destination has been chosen yet", () => {
-    const none = buildMonthGrids().flatMap((g) =>
-      g.cells.filter((c) => c.kind === "day" && c.isBlackout),
-    );
-    expect(none).toHaveLength(0);
+  it("flags a day blacked out at any destination, not only the chosen one", () => {
+    expect(isBlackoutAnywhere("2027-01-16")).toBe(true);
+    expect(isBlackoutAnywhere("2027-02-14")).toBe(true);
+    expect(isBlackoutAnywhere("2027-01-30")).toBe(false);
+  });
+
+  it("still reports which destinations a blackout day affects", () => {
+    expect(blackoutDestinationNames("2027-01-16")).toEqual([
+      "Steamboat Springs",
+      "Winter Park",
+    ]);
+    expect(blackoutDestinationNames("2027-01-30")).toEqual([]);
   });
 });
 

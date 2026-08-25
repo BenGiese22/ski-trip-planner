@@ -128,6 +128,10 @@ describe("respondentPatchSchema", () => {
     );
   });
 
+  it("accepts a null destination, which is how a pick is taken back", () => {
+    expect(respondentPatchSchema.safeParse({ destinationSlug: null }).success).toBe(true);
+  });
+
   it("validates the destination preference against the known slugs", () => {
     expect(respondentPatchSchema.safeParse({ destinationSlug: "steamboat" }).success).toBe(
       true,

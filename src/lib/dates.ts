@@ -1,3 +1,4 @@
+import { destinations } from "@/data/destinations";
 import { passInfo } from "@/data/passInfo";
 import type { DestinationSlug } from "@/data/types";
 
@@ -68,6 +69,23 @@ export function isBlackoutDate(date: string, destinationSlug: DestinationSlug): 
   return blackouts.includes(date);
 }
 
+/**
+ * True if any destination blacks this day out. The grid flags blackout days
+ * the same way for everyone, because when someone can travel and where they'd
+ * rather go are separate questions — and gating one on the other trapped data:
+ * a day marked available before choosing Steamboat became unclearable.
+ */
+export function isBlackoutAnywhere(date: string): boolean {
+  return destinations.some((destination) => isBlackoutDate(date, destination.slug));
+}
+
+/** Which destinations a given day is blacked out at, for the legend copy. */
+export function blackoutDestinationNames(date: string): string[] {
+  return destinations
+    .filter((destination) => isBlackoutDate(date, destination.slug))
+    .map((destination) => destination.name);
+}
+
 export type DayCell =
   | { kind: "blank" }
   | { kind: "day"; date: string; dayOfMonth: number; isBlackout: boolean };
@@ -106,11 +124,10 @@ function monthsSpanned(): { year: number; month: number }[] {
  * columns honest without inviting a click on a day that was never on the
  * table (PLAN.md section 7).
  *
- * Blackout marking is per destination: pass the respondent's chosen
- * destination to have its blackout days flagged, or omit it before a choice
- * has been made, when nothing is decided enough to grey out.
+ * Blackout days are flagged for information only, identically for everyone,
+ * and stay selectable. They are not tied to the destination choice.
  */
-export function buildMonthGrids(destinationSlug?: DestinationSlug): MonthGrid[] {
+export function buildMonthGrids(): MonthGrid[] {
   return monthsSpanned().map(({ year, month }) => {
     const firstOfMonth = Date.UTC(year, month - 1, 1);
     const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
@@ -127,7 +144,7 @@ export function buildMonthGrids(destinationSlug?: DestinationSlug): MonthGrid[] 
               kind: "day",
               date,
               dayOfMonth,
-              isBlackout: destinationSlug ? isBlackoutDate(date, destinationSlug) : false,
+              isBlackout: isBlackoutAnywhere(date),
             }
           : BLANK,
       );

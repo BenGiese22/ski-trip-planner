@@ -1,5 +1,6 @@
 import type { Destination } from "@/data/types";
 import { formatUsdRange } from "@/lib/format";
+import { DestinationPreference } from "./DestinationPreference";
 import { DetailTile } from "./DetailTile";
 import { SourceLine } from "./SourceLine";
 
@@ -11,6 +12,7 @@ const BADGE_CLASSES = {
 export function DestinationCard({ destination }: { destination: Destination }) {
   return (
     <div
+      data-testid={`destination-${destination.slug}`}
       className={`bg-paper border rounded-xl p-5 sm:p-[22px] ${
         destination.badge.tone === "gold" ? "border-2 border-gold" : "border-line"
       }`}
@@ -47,6 +49,7 @@ export function DestinationCard({ destination }: { destination: Destination }) {
       </div>
 
       <SourceLine sources={destination.sources} />
+      <DestinationPreference slug={destination.slug} />
     </div>
   );
 }

@@ -52,8 +52,11 @@ export async function updateRespondent(
   const { destinationSlug, ...columns } = patch;
   const db = getDb();
 
-  if (destinationSlug) {
-    await setDestinationVote(respondent.id, destinationSlug);
+  // `undefined` means the patch didn't mention it; `null` means take the pick
+  // back. Only the latter should clear the stored vote.
+  if (destinationSlug !== undefined) {
+    if (destinationSlug === null) await clearDestinationVote(respondent.id);
+    else await setDestinationVote(respondent.id, destinationSlug);
   }
 
   if (Object.keys(columns).length === 0) {
@@ -88,6 +91,12 @@ export async function setDestinationVote(
   // accumulating a second rank-1 row for a different destination.
   await db.delete(destinationVotes).where(eq(destinationVotes.respondentId, respondentId));
   await db.insert(destinationVotes).values({ respondentId, destinationSlug, rank: 1 });
+}
+
+export async function clearDestinationVote(respondentId: string): Promise<void> {
+  await getDb()
+    .delete(destinationVotes)
+    .where(eq(destinationVotes.respondentId, respondentId));
 }
 
 export async function getDestinationVote(

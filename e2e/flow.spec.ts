@@ -8,6 +8,7 @@ import {
   dayCell,
   destinationVotes,
   onlyRespondent,
+  pickDestination,
   respondentCount,
 } from "./helpers";
 
@@ -73,7 +74,7 @@ test("the destination choice saves and drives the cost table", async ({ page }) 
   await page.goto("/");
   await completeIntake(page);
 
-  await page.getByLabel("Which would you prefer?").selectOption("winterPark");
+  await pickDestination(page, "winterPark");
   await expect(page.getByText(/estimated for/i)).toBeVisible();
 
   await expect
@@ -121,25 +122,46 @@ test("a quick pick fills its whole window in one press", async ({ page }) => {
   ]);
 });
 
-// Section 16, decision 2: blackout days aren't merely flagged, they can't be
-// set at all.
-test("blackout days are not selectable once a blacked-out destination is chosen", async ({
-  page,
-}) => {
+// Availability and destination preference are separate questions. Blackout
+// days are flagged for information and stay fully selectable — gating one on
+// the other also trapped data, since a day marked before choosing Steamboat
+// became impossible to clear.
+test("blackout days are flagged but still selectable", async ({ page }) => {
   await page.goto("/");
   await completeIntake(page);
-  await page.getByLabel("Which would you prefer?").selectOption("steamboat");
 
-  const jan16 = page.getByRole("button", { name: /January 16 — Ikon Session Pass blackout/ });
-  await expect(jan16).toBeDisabled();
+  const jan16 = dayCell(page, "Saturday, January 16");
+  await expect(jan16).toBeEnabled();
+  // The flag is carried in the accessible name, not by disabling the control.
+  await expect(jan16).toHaveAccessibleName(/Ikon Session Pass blackout/);
 
-  await jan16.click({ force: true });
+  await jan16.click();
+  await expect(jan16).toHaveAccessibleName(/available/);
+  await expect.poll(availabilityRows).toEqual([
+    { date: "2027-01-16", status: "available" },
+  ]);
+});
+
+test("choosing a destination never changes what days can be marked", async ({ page }) => {
+  await page.goto("/");
+  await completeIntake(page);
+
+  const jan16 = dayCell(page, "Saturday, January 16");
+  await jan16.click();
+  await expect.poll(availabilityRows).toEqual([
+    { date: "2027-01-16", status: "available" },
+  ]);
+
+  // Steamboat blacks out Jan 16. That must not strand the answer already
+  // given: the day stays clearable, which is what the old coupling broke.
+  await pickDestination(page, "steamboat");
+  await expect(jan16).toBeEnabled();
+
+  await jan16.click(); // -> maybe
+  await jan16.click(); // -> can't make it
+  await jan16.click(); // -> cleared
+  await expect(jan16).toHaveAccessibleName(/not set/);
   await expect.poll(availabilityRows).toEqual([]);
-
-  // Copper has no blackouts on any Ikon tier, so the same day frees up.
-  await page.getByLabel("Which would you prefer?").selectOption("summitCounty");
-  const jan16Free = page.getByRole("button", { name: /Saturday, January 16 —/ });
-  await expect(jan16Free).toBeEnabled();
 });
 
 test("ski days and gear save per person", async ({ page }) => {
@@ -169,7 +191,7 @@ test("ski days and gear save per person", async ({ page }) => {
 test("a pass holder's rental assumption is captioned, not hidden", async ({ page }) => {
   await page.goto("/");
   await completeIntake(page);
-  await page.getByLabel("Which would you prefer?").selectOption("summitCounty");
+  await pickDestination(page, "summitCounty");
 
   const you = page.getByRole("group", { name: "You", exact: true });
   await you.getByRole("button", { name: /i already have a pass/i }).click();
@@ -200,7 +222,7 @@ test("save & finish refuses an incomplete answer, then accepts a complete one", 
   await expect(page.locator(".sticky").getByRole("alert")).toContainText(/at least one day/i);
   expect((await onlyRespondent()).submitted_at).toBeNull();
 
-  await page.getByLabel("Which would you prefer?").selectOption("summitCounty");
+  await pickDestination(page, "summitCounty");
   await page.getByRole("button", { name: /Thu Jan 28 – Sun Jan 31/ }).click();
   const you = page.getByRole("group", { name: "You", exact: true });
   await you.getByRole("button", { name: "2 days" }).click();

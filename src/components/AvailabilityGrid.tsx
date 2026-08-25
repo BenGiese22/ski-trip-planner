@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { destinations } from "@/data/destinations";
 import type { AvailabilityStatus } from "@/db/schema";
 import { buildMonthGrids, datesInRange, quickPicks } from "@/lib/dates";
 import { useResponse } from "./ResponseProvider";
@@ -41,7 +40,6 @@ function describe(date: string) {
 
 export function AvailabilityGrid() {
   const { response, setAvailability } = useResponse();
-  const destinationSlug = response?.destinationSlug ?? null;
   const started = response !== null;
 
   const statuses = useMemo(() => {
@@ -50,22 +48,7 @@ export function AvailabilityGrid() {
     return map;
   }, [response?.availability]);
 
-  const grids = useMemo(
-    () => buildMonthGrids(destinationSlug ?? undefined),
-    [destinationSlug],
-  );
-
-  const blackoutDates = useMemo(
-    () =>
-      new Set(
-        grids.flatMap((grid) =>
-          grid.cells
-            .filter((cell) => cell.kind === "day" && cell.isBlackout)
-            .map((cell) => (cell.kind === "day" ? cell.date : "")),
-        ),
-      ),
-    [grids],
-  );
+  const grids = useMemo(() => buildMonthGrids(), []);
 
   const commit = useCallback(
     (next: Map<string, AvailabilityStatus>) => {
@@ -82,18 +65,15 @@ export function AvailabilityGrid() {
     (from: string, to: string) => {
       const next = new Map(statuses);
       for (const date of datesInRange(from, to)) {
-        // Blackout days aren't selectable at all (section 16, decision 2), so
-        // a drag passing over one skips it rather than painting through it.
-        if (!blackoutDates.has(date)) next.set(date, "available");
+        next.set(date, "available");
       }
       commit(next);
     },
-    [statuses, blackoutDates, commit],
+    [statuses, commit],
   );
 
   const cycle = useCallback(
     (date: string) => {
-      if (blackoutDates.has(date)) return;
       const current = statuses.get(date) ?? "unset";
       const next = new Map(statuses);
       const value = NEXT_STATUS[current];
@@ -101,7 +81,7 @@ export function AvailabilityGrid() {
       else next.delete(date);
       commit(next);
     },
-    [statuses, blackoutDates, commit],
+    [statuses, commit],
   );
 
   // A press that never leaves its cell is a click and cycles that day; one
@@ -124,7 +104,6 @@ export function AvailabilityGrid() {
   }, [painting, cycle]);
 
   function onPointerDown(date: string) {
-    if (blackoutDates.has(date)) return;
     anchor.current = date;
     dragged.current = false;
     setPainting(true);
@@ -138,15 +117,9 @@ export function AvailabilityGrid() {
 
   function applyQuickPick(dates: string[]) {
     const next = new Map(statuses);
-    for (const date of dates) {
-      if (!blackoutDates.has(date)) next.set(date, "available");
-    }
+    for (const date of dates) next.set(date, "available");
     commit(next);
   }
-
-  const blackoutDestinations = destinations
-    .filter((destination) => destination.slug === destinationSlug)
-    .map((destination) => destination.name);
 
   if (!started) {
     return (
@@ -206,20 +179,6 @@ export function AvailabilityGrid() {
                   "aspect-square text-[12px] rounded border flex items-center justify-center " +
                   "focus:outline-2 focus:outline-offset-1 focus:outline-pine";
 
-                if (cell.isBlackout) {
-                  return (
-                    <button
-                      key={cell.date}
-                      type="button"
-                      disabled
-                      aria-label={`${describe(cell.date)} — Ikon Session Pass blackout, not selectable`}
-                      className={`${base} bg-[#F6DAD6] border-dashed border-rust text-rust font-semibold cursor-not-allowed`}
-                    >
-                      {cell.dayOfMonth}
-                    </button>
-                  );
-                }
-
                 return (
                   <button
                     key={cell.date}
@@ -234,10 +193,10 @@ export function AvailabilityGrid() {
                     }}
                     aria-label={`${describe(cell.date)} — ${
                       status ? STATUS_LABEL[status] : "not set"
-                    }`}
+                    }${cell.isBlackout ? ", Ikon Session Pass blackout" : ""}`}
                     className={`${base} ${
                       status ? STATUS_CLASSES[status] : "bg-paper border-line hover:border-gold"
-                    }`}
+                    } ${cell.isBlackout ? "outline outline-1 outline-dashed outline-rust" : ""}`}
                   >
                     {cell.dayOfMonth}
                   </button>
@@ -252,21 +211,18 @@ export function AvailabilityGrid() {
         <Swatch className="bg-green-mid border-[#8FBE77]" label="Available" />
         <Swatch className="bg-[#FFFAEF] border-gold" label="Maybe" />
         <Swatch className="bg-[#EFEFEA] border-line" label="Can't make it" />
-        {blackoutDates.size > 0 && (
-          <Swatch
-            className="bg-[#F6DAD6] border-dashed border-rust"
-            label={`Ikon Session Pass blackout at ${blackoutDestinations.join(" and ")} — not selectable`}
-          />
-        )}
+        <Swatch
+          className="border-dashed border-rust"
+          label="Ikon Session Pass blackout at Steamboat and Winter Park — you can still mark these"
+        />
         <span>Blank cells: outside the mid-Jan–mid-Mar window on purpose</span>
       </div>
 
-      {!destinationSlug && (
-        <p className="text-xs text-ink-soft mt-2">
-          Pick a destination above and any Ikon blackout dates for it will be
-          marked here. Copper Mountain has none on any Ikon tier.
-        </p>
-      )}
+      <p className="text-xs text-ink-soft mt-2">
+        Tell us when you could go regardless of where — the blackout flag is
+        just so you know those days don&rsquo;t work at two of the three
+        options. Copper Mountain has no blackout dates on any Ikon tier.
+      </p>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { TEST_ADMIN_PASSCODE, databaseUrl, truncateAll } from "./database";
-import { completeIntake } from "./helpers";
+import { completeIntake, pickDestination } from "./helpers";
 
 test.beforeEach(async () => {
   await truncateAll(databaseUrl);
@@ -150,7 +150,7 @@ test("a finished response shows up in the heatmap", async ({ page, browser }) =>
   const guestPage = await guest.newPage();
   await guestPage.goto("/");
   await completeIntake(guestPage);
-  await guestPage.getByLabel("Which would you prefer?").selectOption("summitCounty");
+  await pickDestination(guestPage, "summitCounty");
   await guestPage.getByRole("button", { name: /Thu Jan 28 – Sun Jan 31/ }).click();
   const you = guestPage.getByRole("group", { name: "You", exact: true });
   await you.getByRole("button", { name: "2 days" }).click();
@@ -178,7 +178,7 @@ test("the tally lists every destination, including ones nobody picked", async ({
   const guestPage = await guest.newPage();
   await guestPage.goto("/");
   await completeIntake(guestPage);
-  await guestPage.getByLabel("Which would you prefer?").selectOption("steamboat");
+  await pickDestination(guestPage, "steamboat");
   await guestPage.getByRole("button", { name: /Thu Jan 28 – Sun Jan 31/ }).click();
   const you = guestPage.getByRole("group", { name: "You", exact: true });
   await you.getByRole("button", { name: "2 days" }).click();

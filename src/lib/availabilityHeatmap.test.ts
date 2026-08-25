@@ -106,20 +106,15 @@ describe("buildHeatmap", () => {
     expect(cells.every((c) => Number.isFinite(c.ratio))).toBe(true);
   });
 
-  it("marks blackout days for the chosen destination", () => {
-    const steamboat = dayCells(buildHeatmap(counts, 8, "steamboat")).filter(
-      (c) => c.isBlackout,
-    );
-    expect(steamboat).toHaveLength(4);
-    expect(dayCells(buildHeatmap(counts, 8, "summitCounty")).filter((c) => c.isBlackout))
-      .toHaveLength(0);
+  it("flags blackout days for information, independent of any destination", () => {
+    expect(dayCells(buildHeatmap(counts, 8)).filter((c) => c.isBlackout)).toHaveLength(4);
   });
 
   // A blackout day can still carry counts — someone may have marked it before
   // a destination was chosen. The heatmap must render that rather than assume
   // it away.
   it("still reports density on a blackout day", () => {
-    const cell = cellFor(buildHeatmap(counts, 8, "steamboat"), "2027-02-13");
+    const cell = cellFor(buildHeatmap(counts, 8), "2027-02-13");
     expect(cell?.isBlackout).toBe(true);
     expect(cell?.available).toBe(1);
     expect(cell?.maybe).toBe(4);

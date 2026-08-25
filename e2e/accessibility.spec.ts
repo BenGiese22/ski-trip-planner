@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { TEST_ADMIN_PASSCODE, databaseUrl, truncateAll } from "./database";
-import { completeIntake } from "./helpers";
+import { completeIntake, pickDestination } from "./helpers";
 
 test.beforeEach(async () => {
   await truncateAll(databaseUrl);
@@ -22,7 +22,7 @@ test("the first-visit page has no detectable accessibility violations", async ({
 test("the started page, with grid and toggles, has none either", async ({ page }) => {
   await page.goto("/");
   await completeIntake(page, { plusOne: true });
-  await page.getByLabel("Which would you prefer?").selectOption("steamboat");
+  await pickDestination(page, "steamboat");
 
   const results = await scan(page);
   expect(results.violations).toEqual([]);
@@ -71,7 +71,7 @@ test("the heatmap's density ramp holds contrast at every tier", async ({
   const guestPage = await guest.newPage();
   await guestPage.goto("/");
   await completeIntake(guestPage);
-  await guestPage.getByLabel("Which would you prefer?").selectOption("steamboat");
+  await pickDestination(guestPage, "steamboat");
   await guestPage.getByRole("button", { name: /Thu Jan 28 – Sun Jan 31/ }).click();
   // A second press cycles Jan 28 to "maybe", so more than one tier renders.
   await guestPage.getByRole("button", { name: /^Thursday, January 28 —/ }).click();

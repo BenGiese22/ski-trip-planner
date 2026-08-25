@@ -93,3 +93,17 @@ export async function completeIntake(
 export function dayCell(page: Page, label: string) {
   return page.getByRole("button", { name: new RegExp(`^${label} —`) });
 }
+
+/**
+ * The destination preference now lives on each card as a toggle rather than in
+ * a dropdown, so choosing is scoped to the card.
+ */
+export async function pickDestination(page: Page, slug: string) {
+  await page
+    .getByTestId(`destination-${slug}`)
+    .getByRole("button", { name: /prefer this one/i })
+    .click();
+  await expect(
+    page.getByTestId(`destination-${slug}`).getByRole("button", { name: /this is my pick/i }),
+  ).toBeVisible();
+}

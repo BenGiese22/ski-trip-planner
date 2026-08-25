@@ -1,4 +1,3 @@
-import type { DestinationSlug } from "@/data/types";
 import { buildMonthGrids } from "./dates";
 
 /**
@@ -75,11 +74,10 @@ export function densityTier(score: number, totalRespondents: number): DensityTie
 export function buildHeatmap(
   counts: DayCount[],
   totalRespondents: number,
-  destinationSlug?: DestinationSlug,
 ): HeatmapMonthGrid[] {
   const byDate = new Map(counts.map((c) => [c.date, c]));
 
-  return buildMonthGrids(destinationSlug).map((grid) => ({
+  return buildMonthGrids().map((grid) => ({
     label: grid.label,
     year: grid.year,
     month: grid.month,

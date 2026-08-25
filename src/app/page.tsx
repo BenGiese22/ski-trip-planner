@@ -1,7 +1,6 @@
 import { AvailabilityGrid } from "@/components/AvailabilityGrid";
 import { CostSection } from "@/components/CostSection";
 import { DestinationCard } from "@/components/DestinationCard";
-import { DestinationSelect } from "@/components/DestinationSelect";
 import { FlightCards } from "@/components/FlightCards";
 import { Footer } from "@/components/Footer";
 import { Hero } from "@/components/Hero";
@@ -46,14 +45,13 @@ export default async function Home() {
           id="destinations"
           number="02"
           title="Where to go"
-          subtitle="Skiing is one part of the weekend, not the whole point. Each option below is the mountain, the town, the food, and what else there is to do."
+          subtitle="Skiing is one part of the weekend, not the whole point. Each option below is the mountain, the town, the food, and what else there is to do. Tell us which you'd prefer on the card itself — it isn't a vote that binds anyone, it just shows Ben where the group leans and tailors the cost estimate further down."
         >
           <div className="flex flex-col gap-3.5">
             {destinations.map((destination) => (
               <DestinationCard key={destination.slug} destination={destination} />
             ))}
           </div>
-          <DestinationSelect />
         </Section>
 
         <Section

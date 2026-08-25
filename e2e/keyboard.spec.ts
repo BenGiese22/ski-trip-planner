@@ -1,6 +1,12 @@
 import { test, expect } from "@playwright/test";
 import { databaseUrl, truncateAll } from "./database";
-import { availabilityRows, completeIntake, dayCell, onlyRespondent } from "./helpers";
+import {
+  availabilityRows,
+  completeIntake,
+  dayCell,
+  onlyRespondent,
+  pickDestination,
+} from "./helpers";
 
 test.beforeEach(async () => {
   await truncateAll(databaseUrl);
@@ -62,15 +68,19 @@ test("a calendar day can be set entirely from the keyboard", async ({ page }) =>
   await expect(jan28).toHaveAccessibleName(/maybe$/);
 });
 
-test("blackout days are skipped by keyboard navigation", async ({ page }) => {
+test("blackout days are keyboard-operable like any other day", async ({ page }) => {
   await page.goto("/");
   await completeIntake(page);
-  await page.getByLabel("Which would you prefer?").selectOption("steamboat");
+  await pickDestination(page, "steamboat");
 
-  const jan16 = page.getByRole("button", { name: /January 16 — Ikon Session Pass blackout/ });
-  // Disabled controls are not tab stops, which is the behaviour we want for a
-  // day that simply isn't on the table.
-  await expect(jan16).toBeDisabled();
+  // Flagged, but not disabled — so it stays a tab stop and stays usable.
+  const jan16 = dayCell(page, "Saturday, January 16");
+  await expect(jan16).toBeEnabled();
+  await expect(jan16).toHaveAccessibleName(/Ikon Session Pass blackout/);
+
+  await jan16.focus();
+  await page.keyboard.press("Enter");
+  await expect(jan16).toHaveAccessibleName(/available/);
 });
 
 test("the ski-days and gear toggles announce their state and work from the keyboard", async ({

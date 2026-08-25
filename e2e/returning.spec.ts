@@ -1,6 +1,12 @@
 import { expect, test } from "@playwright/test";
 import { databaseUrl, truncateAll } from "./database";
-import { completeIntake, dayCell, onlyRespondent, respondentCount } from "./helpers";
+import {
+  completeIntake,
+  dayCell,
+  onlyRespondent,
+  pickDestination,
+  respondentCount,
+} from "./helpers";
 
 test.beforeEach(async () => {
   await truncateAll(databaseUrl);
@@ -12,7 +18,7 @@ test("a returning visitor's answers are still there after a reload", async ({ pa
   await page.goto("/");
   await completeIntake(page, { plusOne: true });
 
-  await page.getByLabel("Which would you prefer?").selectOption("steamboat");
+  await pickDestination(page, "steamboat");
   await page.getByRole("button", { name: /Thu Jan 28 – Sun Jan 31/ }).click();
   await expect.poll(async () => (await onlyRespondent()).name).toBe("Jamie Rivera");
 
@@ -22,7 +28,9 @@ test("a returning visitor's answers are still there after a reload", async ({ pa
   await expect(page.getByLabel("Your name")).toHaveValue("Jamie Rivera");
   await expect(page.getByLabel("Email")).toHaveValue("jamie@example.com");
   await expect(page.getByLabel("Home airport")).toHaveValue("ORD");
-  await expect(page.getByLabel("Which would you prefer?")).toHaveValue("steamboat");
+  await expect(
+    page.getByTestId("destination-steamboat").getByRole("button", { name: /this is my pick/i }),
+  ).toBeVisible();
   await expect(dayCell(page, "Thursday, January 28")).toHaveAccessibleName(/available$/);
 
   // Still one row — a revisit edits rather than starting over.
@@ -52,7 +60,7 @@ test("a different browser starts a fresh response rather than seeing someone els
 test("editing after finishing keeps the same row and stays final", async ({ page }) => {
   await page.goto("/");
   await completeIntake(page);
-  await page.getByLabel("Which would you prefer?").selectOption("summitCounty");
+  await pickDestination(page, "summitCounty");
   await page.getByRole("button", { name: /Thu Jan 28 – Sun Jan 31/ }).click();
 
   const you = page.getByRole("group", { name: "You", exact: true });

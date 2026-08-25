@@ -59,7 +59,8 @@ export const respondentPatchSchema = z
     plusOneGearStatus: gearStatusSchema,
 
     notes: z.string().max(2000),
-    destinationSlug: destinationSlugSchema,
+    // Nullable so a pick can be taken back, not only changed.
+    destinationSlug: destinationSlugSchema.nullable(),
   })
   .partial();
 
