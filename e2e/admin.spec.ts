@@ -169,3 +169,30 @@ test("a finished response shows up in the heatmap", async ({ page, browser }) =>
   ).toBeVisible();
   await expect(page.getByLabel(/Tuesday, February 2 — nobody yet/)).toBeVisible();
 });
+
+test("the tally lists every destination, including ones nobody picked", async ({
+  page,
+  browser,
+}) => {
+  const guest = await browser.newContext();
+  const guestPage = await guest.newPage();
+  await guestPage.goto("/");
+  await completeIntake(guestPage);
+  await guestPage.getByLabel("Which would you prefer?").selectOption("steamboat");
+  await guestPage.getByRole("button", { name: /Thu Jan 28 – Sun Jan 31/ }).click();
+  const you = guestPage.getByRole("group", { name: "You", exact: true });
+  await you.getByRole("button", { name: "2 days" }).click();
+  await you.getByRole("button", { name: /i need gear/i }).click();
+  await guestPage.getByRole("button", { name: /save & finish/i }).click();
+  await expect(guestPage.getByRole("button", { name: /update my answer/i })).toBeVisible();
+  await guest.close();
+
+  await signIn(page);
+
+  // The chosen one shows its count and share...
+  await expect(page.getByText(/1 vote · 100%/)).toBeVisible();
+  // ...and the two nobody picked are still listed at zero, rather than
+  // vanishing from the table.
+  await expect(page.getByText("0 votes")).toHaveCount(2);
+  await expect(page.getByText("Winter Park", { exact: true })).toBeVisible();
+});

@@ -1,10 +1,16 @@
 import type { Metadata } from "next";
+import { AdminDestinationTally } from "@/components/AdminDestinationTally";
 import { AdminHeatmap } from "@/components/AdminHeatmap";
 import { AdminLoginForm } from "@/components/AdminLoginForm";
 import { AdminLogoutButton } from "@/components/AdminLogoutButton";
-import { availabilityCountsByDate, countSubmittedRespondents } from "@/db/queries";
+import {
+  availabilityCountsByDate,
+  countSubmittedRespondents,
+  listSubmittedDestinationVotes,
+} from "@/db/queries";
 import { isAdminAuthenticated } from "@/lib/adminServerSession";
 import { buildHeatmap } from "@/lib/availabilityHeatmap";
+import { tallyDestinations } from "@/lib/destinationTally";
 
 export const metadata: Metadata = {
   title: "Responses — Colorado ski trip planner",
@@ -48,9 +54,10 @@ export default async function AdminPage() {
 }
 
 async function AdminDashboard() {
-  const [totalRespondents, counts] = await Promise.all([
+  const [totalRespondents, counts, votes] = await Promise.all([
     countSubmittedRespondents(),
     availabilityCountsByDate(),
+    listSubmittedDestinationVotes(),
   ]);
 
   return (
@@ -76,6 +83,20 @@ async function AdminDashboard() {
             grids={buildHeatmap(counts, totalRespondents)}
             totalRespondents={totalRespondents}
           />
+        )}
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-xl mb-1.5">Where they&rsquo;d rather go</h2>
+        <p className="text-sm text-ink-soft max-w-[60ch] mb-4">
+          Every option is listed, including any nobody has picked.
+        </p>
+        {totalRespondents === 0 ? (
+          <p className="text-sm text-ink-soft border border-line rounded-lg p-4">
+            No preferences yet.
+          </p>
+        ) : (
+          <AdminDestinationTally rows={tallyDestinations(votes, totalRespondents)} />
         )}
       </section>
     </div>

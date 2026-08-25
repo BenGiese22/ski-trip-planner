@@ -208,3 +208,14 @@ export async function availabilityCountsByDate(): Promise<DayCount[]> {
   }
   return [...byDate.values()];
 }
+
+/** Rank-1 votes from finished responses only (§17 decision 3). */
+export async function listSubmittedDestinationVotes(): Promise<
+  { destinationSlug: DestinationSlug }[]
+> {
+  return getDb()
+    .select({ destinationSlug: destinationVotes.destinationSlug })
+    .from(destinationVotes)
+    .innerJoin(respondents, eq(destinationVotes.respondentId, respondents.id))
+    .where(and(eq(destinationVotes.rank, 1), isNotNull(respondents.submittedAt)));
+}
