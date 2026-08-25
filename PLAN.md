@@ -407,10 +407,16 @@ settled.
 7. **Admin session lasts 12 hours**, and **`/admin` has a logout control** —
    this will get opened on a phone.
 
-8. **Rate limits: 5 login attempts per 5 minutes per IP; 60 writes per minute
+8. **Rate limits: 5 login attempts per 5 minutes per IP; 300 writes per minute
    per IP** on the guest endpoints. Calibrated against section 14's "a dozen
-   friends" bar. `useAutosave` debounces at 700ms and serialises writes, so real
-   form-filling stays far under the write limit.
+   friends" bar. *[Corrected during implementation: the guest figure was
+   originally 60/min, which a test caught as too low to ship. The 700ms
+   autosave debounce alone permits ~86 writes/minute, and section 6 asks the
+   calendar grid to save on change rather than on a debounce, so drag-painting
+   emits roughly one request per network round trip. 60/min would have
+   rate-limited guests out of their own form. The limit is a backstop against
+   scripted abuse, not a quota on real use, so it should sit well clear of the
+   legitimate ceiling.]*
 
 9. **`ADMIN_PASSCODE` is set by Ben directly** — `vercel env add ADMIN_PASSCODE
    production` plus a line in `.env.local` — so the real value never passes

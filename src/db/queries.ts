@@ -1,10 +1,18 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, lt, sql } from "drizzle-orm";
 import type { DestinationSlug } from "@/data/types";
 import type { AvailabilityBulkInput, IntakeInput, RespondentPatch } from "@/lib/schemas";
+import {
+  PRUNE_AFTER_MS,
+  currentWindowStart,
+  isAllowed,
+  retryAfterMs,
+  type RateLimitConfig,
+} from "@/lib/rateLimit";
 import { getDb } from "./client";
 import {
   availability,
   destinationVotes,
+  rateLimits,
   respondents,
   type AvailabilityRow,
   type Respondent,
@@ -117,4 +125,43 @@ export async function replaceAvailability(
       await tx.insert(availability).values(entries.map((entry) => ({ respondentId, ...entry })));
     }
   });
+}
+
+/**
+ * Increments this bucket's counter and reports whether the request may
+ * proceed. The increment and the read happen in one statement — a
+ * check-then-increment would let two concurrent requests both observe a count
+ * under the limit and both be allowed through.
+ *
+ * Also prunes windows past PRUNE_AFTER_MS while it's here, so the table can't
+ * grow without bound (§17 decision 6). Doing it inline avoids a cron job for
+ * what is, at this scale, a handful of rows a day.
+ */
+export async function hitRateLimit(
+  key: string,
+  { limit, windowMs }: RateLimitConfig,
+  now: number = Date.now(),
+): Promise<{ allowed: boolean; retryAfterMs: number }> {
+  const db = getDb();
+  const windowStart = new Date(currentWindowStart(now, windowMs));
+
+  const [row] = await db
+    .insert(rateLimits)
+    .values({ bucketKey: key, windowStart, count: 1 })
+    .onConflictDoUpdate({
+      target: [rateLimits.bucketKey, rateLimits.windowStart],
+      set: { count: sql`${rateLimits.count} + 1` },
+    })
+    .returning({ count: rateLimits.count });
+
+  // Best-effort: a failed prune must never fail the request it rode in on.
+  void db
+    .delete(rateLimits)
+    .where(lt(rateLimits.windowStart, new Date(now - PRUNE_AFTER_MS)))
+    .catch(() => {});
+
+  return {
+    allowed: isAllowed(row.count, limit),
+    retryAfterMs: retryAfterMs(now, windowStart.getTime(), windowMs),
+  };
 }

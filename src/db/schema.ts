@@ -78,6 +78,26 @@ export const destinationVotes = pgTable(
   (table) => [primaryKey({ columns: [table.respondentId, table.destinationSlug] })],
 );
 
+/**
+ * Fixed-window rate limiting (PLAN.md §17 decision 8). One row per
+ * (bucket, window); rows older than PRUNE_AFTER_MS are deleted
+ * opportunistically by the limiter itself rather than by a cron job, since
+ * nothing ever reads a window once it has rolled over (decision 6).
+ *
+ * Deliberately unrelated to respondents — no foreign key, no cascade. Rate
+ * limiting has to work for callers who have no respondent row at all, which
+ * is precisely the case worth limiting.
+ */
+export const rateLimits = pgTable(
+  "rate_limits",
+  {
+    bucketKey: text("bucket_key").notNull(),
+    windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+    count: integer("count").notNull().default(0),
+  },
+  (table) => [primaryKey({ columns: [table.bucketKey, table.windowStart] })],
+);
+
 export type Respondent = typeof respondents.$inferSelect;
 export type NewRespondent = typeof respondents.$inferInsert;
 export type AvailabilityRow = typeof availability.$inferSelect;
