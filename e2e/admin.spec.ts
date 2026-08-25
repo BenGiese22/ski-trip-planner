@@ -117,6 +117,9 @@ async function signIn(page: import("@playwright/test").Page) {
   await page.getByLabel(passcodeField).fill(TEST_ADMIN_PASSCODE);
   await page.getByRole("button", { name: submit }).click();
   await expect(page.getByTestId("admin-dashboard")).toBeVisible();
+  // router.refresh() can leave the form mounted for a beat; wait it out so
+  // assertions never race the swap.
+  await expect(page.getByLabel(passcodeField)).toBeHidden();
 }
 
 test("with no responses the dashboard says so instead of showing an empty grid", async ({

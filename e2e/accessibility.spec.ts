@@ -52,6 +52,9 @@ test("the signed-in admin view has none either, empty", async ({ page }) => {
   await page.getByLabel("Passcode").fill(TEST_ADMIN_PASSCODE);
   await page.getByRole("button", { name: /show me the responses/i }).click();
   await expect(page.getByTestId("admin-dashboard")).toBeVisible();
+  // Settle: router.refresh() can leave the form mounted for a beat, and axe
+  // scanning a half-swapped DOM produced an intermittent failure.
+  await expect(page.getByLabel("Passcode")).toBeHidden();
 
   const results = await scan(page);
   expect(results.violations).toEqual([]);
@@ -83,6 +86,7 @@ test("the heatmap's density ramp holds contrast at every tier", async ({
   await page.getByLabel("Passcode").fill(TEST_ADMIN_PASSCODE);
   await page.getByRole("button", { name: /show me the responses/i }).click();
   await expect(page.getByTestId("admin-dashboard")).toBeVisible();
+  await expect(page.getByLabel("Passcode")).toBeHidden();
   await expect(page.getByLabel(/January 29 — 1 available/)).toBeVisible();
 
   const results = await scan(page);
