@@ -273,7 +273,9 @@ vercel env pull .env.local
 npx drizzle-kit push        # or your migration tool of choice
 ```
 
-**[Update, Phase 0]:** the Vercel project (`ski-trip-planner`) and its Supabase Postgres integration are already set up — skip the "Storage tab → Create → Postgres" step above and use the Supabase connection string already present in the project's env vars instead. `vercel env pull` still works the same way to bring those into `.env.local`.
+**[Update, Phase 0]:** the Vercel project (`ski-trip-planner`) and its Supabase Postgres integration are already set up — skip the "Storage tab → Create → Postgres" step above and use the Supabase connection string already present in the project's env vars instead.
+
+**[Correction, Phase 2]:** `vercel env pull` does *not* bring the Supabase connection string into `.env.local`. The integration created `POSTGRES_URL` and `POSTGRES_URL_NON_POOLING` (among others) scoped to Production and Preview only, and marked **Sensitive** — Vercel treats sensitive vars as write-only, so they read back as the literal string `[SENSITIVE]` and cannot be retrieved by CLI or API at all. Deployed environments are unaffected (Vercel injects the real values at runtime), but anything local that needs to reach Supabase — `drizzle-kit push`, `npm run dev` against real data — needs the connection string copied by hand from the Supabase dashboard (Project Settings → Database → Connection string) into `.env.local`. Local and CI test runs don't need it: they set `DATABASE_URL` against a throwaway Docker Postgres, which `src/db/client.ts` prefers when present (section 16, decision 5).
 
 Add `ADMIN_PASSCODE` as an env var in Vercel (production + preview) before Phase 3.
 

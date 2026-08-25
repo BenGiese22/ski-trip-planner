@@ -8,8 +8,12 @@ something to reuse.
 ## House style
 
 - **Package manager**: npm. Don't introduce pnpm/yarn.
-- **Commits**: direct commits to the phase branch (currently
-  `claude/ski-trip-web-app-445iaa`), no PR required unless asked. Commit at
+- **Branching**: trunk-based off `main` — `main` is what ships. Feature work
+  goes on a `bgiese/`-prefixed branch cut from `origin/main` and merges back
+  via PR (`/pr`, assigned to BenGiese22). Phase 2 onward follows this; Phases
+  0–1 predate it and were committed directly to
+  `claude/ski-trip-web-app-445iaa`.
+- **Commits**: Conventional Commits syntax, subject under 50 chars. Commit at
   natural checkpoints — end of each red/green/refactor cycle, end of each
   phase — with clear, descriptive messages. Prefer several reviewable commits
   over one large diff.
