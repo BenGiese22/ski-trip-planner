@@ -8,9 +8,17 @@ export type TripCostInput = {
   airport: AirportCode;
   destinationSlug: DestinationSlug;
   skiDays: SkiDays;
-  gearStatus: GearStatus;
+  /** Null while the person hasn't answered the gear question yet. */
+  gearStatus: GearStatus | null;
   nights: number;
   foodDays: number;
+  /**
+   * Ben and Megan already hold the Base Pass, and a guest might too. Their
+   * lift access is already paid for, so that line drops out entirely — the
+   * same treatment gear owners get for the rental line, and for the same
+   * reason: a $0 row invites more questions than an absent one.
+   */
+  alreadyHasPass?: boolean;
 };
 
 export type CostLineItem = {
@@ -28,7 +36,15 @@ function scaleRange([low, high]: readonly [number, number], by: number): [number
 }
 
 export function estimateTripCost(input: TripCostInput): TripCostEstimate {
-  const { airport, destinationSlug, skiDays, gearStatus, nights, foodDays } = input;
+  const {
+    airport,
+    destinationSlug,
+    skiDays,
+    gearStatus,
+    nights,
+    foodDays,
+    alreadyHasPass = false,
+  } = input;
   const lineItems: CostLineItem[] = [];
 
   lineItems.push({
@@ -41,7 +57,9 @@ export function estimateTripCost(input: TripCostInput): TripCostEstimate {
     range: scaleRange(costAssumptions.lodgingPerNightByDestination[destinationSlug], nights),
   });
 
-  if (skiDays === 1) {
+  if (alreadyHasPass) {
+    // No pass line at all — see TripCostInput.alreadyHasPass.
+  } else if (skiDays === 1) {
     const ticketRange = costAssumptions.oneDayLiftTicketByDestination[destinationSlug];
     lineItems.push({
       label: "1-day lift ticket",

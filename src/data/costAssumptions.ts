@@ -40,6 +40,14 @@ export const costAssumptions = {
     default: [45, 65],
   },
   foodAndApresPerDay: [40, 70],
+  // Nothing about the trip length is settled yet — the availability grid asks
+  // when people are free, not how long the trip runs. These figures are the
+  // shape of the weekend the quick-picks describe, and the cost breakdown
+  // captions them as an assumption rather than presenting them as decided.
+  tripLength: {
+    nights: 4,
+    foodDays: 4,
+  },
 } as const;
 
 export const costSources: Source[] = [
