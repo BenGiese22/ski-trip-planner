@@ -1,5 +1,6 @@
-import { and, eq, lt, sql } from "drizzle-orm";
+import { and, eq, isNotNull, lt, sql } from "drizzle-orm";
 import type { DestinationSlug } from "@/data/types";
+import type { DayCount } from "@/lib/availabilityHeatmap";
 import type { AvailabilityBulkInput, IntakeInput, RespondentPatch } from "@/lib/schemas";
 import {
   PRUNE_AFTER_MS,
@@ -164,4 +165,46 @@ export async function hitRateLimit(
     allowed: isAllowed(row.count, limit),
     retryAfterMs: retryAfterMs(now, windowStart.getTime(), windowMs),
   };
+}
+
+/**
+ * Admin reads. Every one of these is filtered to submitted responses only
+ * (PLAN.md §17 decision 3) — an abandoned half-filled row shouldn't move any
+ * of Ben's numbers.
+ */
+export async function countSubmittedRespondents(): Promise<number> {
+  const [row] = await getDb()
+    .select({ count: sql<number>`count(*)::int` })
+    .from(respondents)
+    .where(isNotNull(respondents.submittedAt));
+  return row?.count ?? 0;
+}
+
+/**
+ * One row per (date, status), pivoted into the per-day shape the heatmap
+ * wants. Counting in SQL and shaping in TypeScript keeps the interesting part
+ * — the weighting and tiering — as pure, fast-to-test logic.
+ */
+export async function availabilityCountsByDate(): Promise<DayCount[]> {
+  const rows = await getDb()
+    .select({
+      date: availability.date,
+      status: availability.status,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(availability)
+    .innerJoin(respondents, eq(availability.respondentId, respondents.id))
+    .where(isNotNull(respondents.submittedAt))
+    .groupBy(availability.date, availability.status);
+
+  const byDate = new Map<string, DayCount>();
+  for (const row of rows) {
+    const entry = byDate.get(row.date) ?? { date: row.date, available: 0, maybe: 0 };
+    // "unavailable" is deliberately not counted: it contributes nothing to
+    // how good a day looks, and folding it in would only ever be misleading.
+    if (row.status === "available") entry.available += row.count;
+    else if (row.status === "maybe") entry.maybe += row.count;
+    byDate.set(row.date, entry);
+  }
+  return [...byDate.values()];
 }

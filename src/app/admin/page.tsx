@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
+import { AdminHeatmap } from "@/components/AdminHeatmap";
 import { AdminLoginForm } from "@/components/AdminLoginForm";
 import { AdminLogoutButton } from "@/components/AdminLogoutButton";
+import { availabilityCountsByDate, countSubmittedRespondents } from "@/db/queries";
 import { isAdminAuthenticated } from "@/lib/adminServerSession";
+import { buildHeatmap } from "@/lib/availabilityHeatmap";
 
 export const metadata: Metadata = {
   title: "Responses — Colorado ski trip planner",
@@ -44,14 +47,37 @@ export default async function AdminPage() {
   );
 }
 
-/**
- * Placeholder for step 3. The heatmap, tally and cost rollup land in steps
- * 4-7; this exists so the gate itself is testable end to end first.
- */
-function AdminDashboard() {
+async function AdminDashboard() {
+  const [totalRespondents, counts] = await Promise.all([
+    countSubmittedRespondents(),
+    availabilityCountsByDate(),
+  ]);
+
   return (
-    <p className="text-sm text-ink-soft" data-testid="admin-dashboard">
-      Signed in. The heatmap, destination tally and cost rollup land here next.
-    </p>
+    <div data-testid="admin-dashboard">
+      <p className="text-sm text-ink-soft mb-6">
+        <strong className="text-ink font-mono">{totalRespondents}</strong>{" "}
+        {totalRespondents === 1 ? "person has" : "people have"} finished their
+        response.
+      </p>
+
+      <section className="mb-10">
+        <h2 className="text-xl mb-1.5">When the group can go</h2>
+        <p className="text-sm text-ink-soft max-w-[60ch] mb-4">
+          The darker the day, the more of the group it works for.
+        </p>
+        {totalRespondents === 0 ? (
+          <p className="text-sm text-ink-soft border border-line rounded-lg p-4">
+            Nothing to show yet — the heatmap fills in as people finish their
+            responses.
+          </p>
+        ) : (
+          <AdminHeatmap
+            grids={buildHeatmap(counts, totalRespondents)}
+            totalRespondents={totalRespondents}
+          />
+        )}
+      </section>
+    </div>
   );
 }

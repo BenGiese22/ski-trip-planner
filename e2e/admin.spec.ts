@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { TEST_ADMIN_PASSCODE, databaseUrl, truncateAll } from "./database";
+import { completeIntake } from "./helpers";
 
 test.beforeEach(async () => {
   await truncateAll(databaseUrl);
@@ -109,4 +110,59 @@ test("repeated wrong passcodes get rate limited", async ({ page, request }) => {
     failOnStatusCode: false,
   });
   expect(afterLimit.status()).toBe(429);
+});
+
+async function signIn(page: import("@playwright/test").Page) {
+  await page.goto("/admin");
+  await page.getByLabel(passcodeField).fill(TEST_ADMIN_PASSCODE);
+  await page.getByRole("button", { name: submit }).click();
+  await expect(page.getByTestId("admin-dashboard")).toBeVisible();
+}
+
+test("with no responses the dashboard says so instead of showing an empty grid", async ({
+  page,
+}) => {
+  await signIn(page);
+
+  await expect(page.getByText(/0\s/).first()).toBeVisible();
+  await expect(page.getByText(/the heatmap fills in as people finish/i)).toBeVisible();
+});
+
+// Section 17 decision 3: only finished responses move the numbers.
+test("an unfinished response is not counted", async ({ page, browser }) => {
+  const guest = await browser.newContext();
+  const guestPage = await guest.newPage();
+  await guestPage.goto("/");
+  await completeIntake(guestPage);
+  await guestPage.getByRole("button", { name: /Thu Jan 28 – Sun Jan 31/ }).click();
+  // Deliberately no "Save & finish".
+  await guest.close();
+
+  await signIn(page);
+  await expect(page.getByText(/the heatmap fills in as people finish/i)).toBeVisible();
+});
+
+test("a finished response shows up in the heatmap", async ({ page, browser }) => {
+  const guest = await browser.newContext();
+  const guestPage = await guest.newPage();
+  await guestPage.goto("/");
+  await completeIntake(guestPage);
+  await guestPage.getByLabel("Which would you prefer?").selectOption("summitCounty");
+  await guestPage.getByRole("button", { name: /Thu Jan 28 – Sun Jan 31/ }).click();
+  const you = guestPage.getByRole("group", { name: "You", exact: true });
+  await you.getByRole("button", { name: "2 days" }).click();
+  await you.getByRole("button", { name: /i need gear/i }).click();
+  await guestPage.getByRole("button", { name: /save & finish/i }).click();
+  await expect(guestPage.getByRole("button", { name: /update my answer/i })).toBeVisible();
+  await guest.close();
+
+  await signIn(page);
+
+  await expect(page.getByText(/1 person has finished/i)).toBeVisible();
+  // The quick pick marked Jan 28-31 available, so those days carry a count
+  // and the accessible label states it without relying on the shading.
+  await expect(
+    page.getByLabel(/Thursday, January 28 — 1 available/),
+  ).toBeVisible();
+  await expect(page.getByLabel(/Tuesday, February 2 — nobody yet/)).toBeVisible();
 });
