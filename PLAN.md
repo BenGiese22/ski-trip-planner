@@ -357,3 +357,71 @@ Phase 0 and Phase 1 are complete and live (see the commit history and CLAUDE.md)
 8. **New `email` field, not in the original section 5 schema.** Added so the host can reach respondents later. Required to complete "Save & finish" (not optional) — shown in the intake step alongside name/plus-one/airport/ski-level.
 
 These decisions supersede the corresponding details in sections 5–8 and 10 above where they conflict; the rest of those sections still apply as written.
+
+---
+
+## 17. Phase 3 implementation decisions (confirmed before implementation started)
+
+Phase 2 is complete, merged to `main`, and live. Before writing Phase 3 code, a
+Fable planning agent produced a detailed implementation plan (passcode gate,
+aggregation modules, rate limiting, accessibility, build order) and the
+following decisions were made explicitly. As with section 16, treat these as
+settled.
+
+1. **Build the passcode gate; don't use Vercel Deployment Protection.** Section 6
+   offers both. Vercel's built-in protection would need no auth code, but it
+   would also block the Playwright suite exactly the way it blocks any
+   unauthenticated client — the preview deploy couldn't be tested end to end
+   during Phase 2 for precisely this reason. A passcode keeps `/admin` a normal,
+   testable part of the app on every environment.
+
+2. **`maybe` counts toward heatmap density at a quarter weight.**
+   `score = available + 0.25 × maybe`, and the density tier is computed from
+   that score. Both raw numbers stay visible in the cell. A "maybe" is real
+   signal but much weaker than a yes, and blending them equally would make a day
+   everyone is unsure about look like a day everyone is free.
+
+3. **Only completed responses are reported.** Every admin figure — count,
+   heatmap, tally, cost rollup — is filtered to `submitted_at IS NOT NULL`.
+   In-progress respondents are not surfaced at all, not even as a secondary
+   count. Section 6 gives `submitted_at` exactly this job.
+
+4. **No per-day "who's available" drill-down.** Sections 3 and 7 describe a
+   density view. A drill-down adds expand/collapse controls and focus management
+   for information nobody asked for; revisit in a later phase if the heatmap
+   alone proves too coarse.
+
+5. **The admin cookie is signed with its own random secret**
+   (`ADMIN_COOKIE_SECRET`, 32 random bytes), not with `ADMIN_PASSCODE`. Reusing
+   the passcode as the HMAC key would let anyone holding one observed cookie
+   brute-force a human-chosen passcode *offline*, at full speed, with the login
+   rate limit never involved. The data at stake is low value and the attack is
+   largely theoretical — this is accepted on the grounds that it costs one
+   machine-generated env var, not because the threat is pressing.
+
+6. **`rate_limits` rows are pruned after 12 hours**, deleted opportunistically
+   inside the limiter rather than by a cron job or separate process. Each new
+   (bucket, window) pair inserts a row that is never read again; without pruning
+   the table grows without bound. Slow at this scale, but still a leak.
+
+7. **Admin session lasts 12 hours**, and **`/admin` has a logout control** —
+   this will get opened on a phone.
+
+8. **Rate limits: 5 login attempts per 5 minutes per IP; 60 writes per minute
+   per IP** on the guest endpoints. Calibrated against section 14's "a dozen
+   friends" bar. `useAutosave` debounces at 700ms and serialises writes, so real
+   form-filling stays far under the write limit.
+
+9. **`ADMIN_PASSCODE` is set by Ben directly** — `vercel env add ADMIN_PASSCODE
+   production` plus a line in `.env.local` — so the real value never passes
+   through an agent transcript. Per the section 12 correction, it must also
+   exist in the `development` environment (or `.env.local`) for local runs to
+   work. The e2e suite uses its own committed throwaway passcode and never
+   touches the real one.
+
+10. **`mockup.html` stays frozen** at its pre-build state (three airports, no
+    admin view). It is a design reference from before implementation, not a
+    living artifact.
+
+These decisions supersede the corresponding details in sections 3, 6, 7, 8 and
+14 above where they conflict; the rest of those sections still apply as written.
