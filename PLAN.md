@@ -275,7 +275,21 @@ npx drizzle-kit push        # or your migration tool of choice
 
 **[Update, Phase 0]:** the Vercel project (`ski-trip-planner`) and its Supabase Postgres integration are already set up — skip the "Storage tab → Create → Postgres" step above and use the Supabase connection string already present in the project's env vars instead.
 
-**[Correction, Phase 2]:** `vercel env pull` does *not* bring the Supabase connection string into `.env.local`. The integration created `POSTGRES_URL` and `POSTGRES_URL_NON_POOLING` (among others) scoped to Production and Preview only, and marked **Sensitive** — Vercel treats sensitive vars as write-only, so they read back as the literal string `[SENSITIVE]` and cannot be retrieved by CLI or API at all. Deployed environments are unaffected (Vercel injects the real values at runtime), but anything local that needs to reach Supabase — `drizzle-kit push`, `npm run dev` against real data — needs the connection string copied by hand from the Supabase dashboard (Project Settings → Database → Connection string) into `.env.local`. Local and CI test runs don't need it: they set `DATABASE_URL` against a throwaway Docker Postgres, which `src/db/client.ts` prefers when present (section 16, decision 5).
+**[Correction, Phase 2]:** `vercel env pull` doesn't bring the Supabase connection string into `.env.local` *by default*, and the reason is worth knowing. The Vercel↔Supabase integration connects its resource to the **production and preview** environments only, and the env vars it creates there are marked **Sensitive** — Vercel stores those in an unreadable format, so they come back as the literal string `[SENSITIVE]` from the CLI, the API, and the dashboard alike. `vercel env pull` defaults to the *development* environment, where those keys simply don't exist, which is why a bare pull returns almost nothing.
+
+**The fix**: add `development` to the variables' target list. Vercel forbids sensitive variables in the development environment ("If the Development environment is selected, you will be unable to enable the switch"), so a development-targeted value is readable, and `vercel env pull` returns it in plaintext from then on:
+
+```bash
+# One-off, per variable. Get each id from the project env listing.
+vercel api /v9/projects/<project-id>/env            # find the id for POSTGRES_URL
+echo '{"target":["production","preview","development"]}' > patch.json
+vercel api -X PATCH /v9/projects/<project-id>/env/<env-id> --input patch.json
+vercel env pull .env.local --environment=development
+```
+
+Done for `POSTGRES_URL` and `POSTGRES_URL_NON_POOLING` on this project. `vercel integration resource connect <resource> <project> --environment development` is the tidier route for a fresh setup, but it refuses when the project is already connected and wants a disconnect first, which would pull the variables out of production in the meantime.
+
+Local and CI test runs still don't need any of this: they set `DATABASE_URL` against a throwaway Docker Postgres, which `src/db/client.ts` prefers when present (section 16, decision 5).
 
 Add `ADMIN_PASSCODE` as an env var in Vercel (production + preview) before Phase 3.
 
