@@ -1,6 +1,10 @@
 import { existsSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
-import { databaseUrl } from "./e2e/database";
+import {
+  TEST_ADMIN_COOKIE_SECRET,
+  TEST_ADMIN_PASSCODE,
+  databaseUrl,
+} from "./e2e/database";
 
 // This dev container ships a preinstalled Chromium at a fixed path (see
 // repo root system notes); CI runners install their own via
@@ -46,6 +50,10 @@ export default defineConfig({
     timeout: 180_000,
     // The app's DB client prefers DATABASE_URL, so this is what keeps a test
     // run pointed at the throwaway Postgres instead of production Supabase.
-    env: { DATABASE_URL: databaseUrl },
+    env: {
+      DATABASE_URL: databaseUrl,
+      ADMIN_PASSCODE: TEST_ADMIN_PASSCODE,
+      ADMIN_COOKIE_SECRET: TEST_ADMIN_COOKIE_SECRET,
+    },
   },
 });

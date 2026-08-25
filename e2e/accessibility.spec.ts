@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-import { databaseUrl, truncateAll } from "./database";
+import { TEST_ADMIN_PASSCODE, databaseUrl, truncateAll } from "./database";
 import { completeIntake } from "./helpers";
 
 test.beforeEach(async () => {
@@ -36,5 +36,23 @@ test("the gold accent on pine holds up in the save bar", async ({ page }) => {
     .withTags(["wcag2aa"])
     .include(".sticky")
     .analyze();
+  expect(results.violations).toEqual([]);
+});
+
+test("the admin passcode gate has no detectable accessibility violations", async ({
+  page,
+}) => {
+  await page.goto("/admin");
+  const results = await scan(page);
+  expect(results.violations).toEqual([]);
+});
+
+test("the signed-in admin view has none either", async ({ page }) => {
+  await page.goto("/admin");
+  await page.getByLabel("Passcode").fill(TEST_ADMIN_PASSCODE);
+  await page.getByRole("button", { name: /show me the responses/i }).click();
+  await expect(page.getByTestId("admin-dashboard")).toBeVisible();
+
+  const results = await scan(page);
   expect(results.violations).toEqual([]);
 });

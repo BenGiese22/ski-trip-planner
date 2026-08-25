@@ -75,15 +75,31 @@ export function pushSchema(url: string): void {
 }
 
 /**
- * Between specs, so one test's respondent can't be seen by the next. Goes
- * through the driver rather than `docker exec psql`, so it works just as well
- * against a Postgres this file didn't start.
+ * Between specs, so one test's state can't be seen by the next. Goes through
+ * the driver rather than `docker exec psql`, so it works just as well against
+ * a Postgres this file didn't start.
+ *
+ * `rate_limits` has to be named explicitly: it deliberately has no foreign key
+ * to respondents (rate limiting must work for callers with no respondent row),
+ * so `cascade` doesn't reach it. Without this, limiter state leaks between
+ * tests — the admin spec alone spends exactly the login allowance, so a
+ * Playwright retry would start already throttled and fail for a reason that
+ * looks nothing like the cause.
  */
 export async function truncateAll(url: string): Promise<void> {
   const sql = postgres(url, { prepare: false, max: 1, onnotice: () => {} });
   try {
-    await sql`truncate respondents cascade`;
+    await sql`truncate respondents, rate_limits cascade`;
   } finally {
     await sql.end({ timeout: 5 });
   }
 }
+
+/**
+ * Admin credentials for the e2e suite only. Committed on purpose: they gate
+ * nothing but the throwaway container this file starts, and hardcoding them
+ * keeps a test run from depending on whatever happens to be in .env.local.
+ * These must never be the real production values.
+ */
+export const TEST_ADMIN_PASSCODE = "e2e-passcode-not-a-secret";
+export const TEST_ADMIN_COOKIE_SECRET = "e2e-cookie-secret-not-a-secret";
