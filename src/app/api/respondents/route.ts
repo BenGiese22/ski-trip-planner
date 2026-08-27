@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createRespondent, updateRespondent } from "@/db/queries";
-import { badRequest, noSuchRespondent, readJson } from "@/lib/api";
+import { badRequest, noSuchRespondent, guestWriteLimit, readJson } from "@/lib/api";
 import { intakeSchema, respondentPatchSchema } from "@/lib/schemas";
 import {
   IDENTITY_COOKIE,
@@ -19,6 +19,9 @@ import { currentRespondent, loadClientResponse } from "@/lib/serverSession";
  * existing response instead of creating a duplicate.
  */
 export async function POST(request: Request) {
+  const limited = await guestWriteLimit(request);
+  if (limited) return limited;
+
   const parsed = intakeSchema.safeParse(await readJson(request));
   if (!parsed.success) return badRequest(parsed.error);
 
@@ -49,6 +52,9 @@ export async function POST(request: Request) {
  * completeness would defeat "close the tab and come back" (section 6).
  */
 export async function PATCH(request: Request) {
+  const limited = await guestWriteLimit(request);
+  if (limited) return limited;
+
   const respondent = await currentRespondent();
   if (!respondent) return noSuchRespondent();
 

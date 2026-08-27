@@ -238,3 +238,29 @@ test("save & finish refuses an incomplete answer, then accepts a complete one", 
   await expect.poll(async () => (await onlyRespondent()).submitted_at).not.toBeNull();
   await expect(page.getByRole("button", { name: /update my answer/i })).toBeVisible();
 });
+
+// §14 asks for the public write endpoints to be throttled too, not just the
+// admin passcode. The limit is deliberately far above what real form-filling
+// produces — see GUEST_WRITE_LIMIT — so this drives the API directly rather
+// than trying to click fast enough.
+test("the guest write endpoints are rate limited", async ({ request }) => {
+  const { GUEST_WRITE_LIMIT } = await import("../src/lib/rateLimit");
+
+  let sawLimit = false;
+  for (let i = 0; i < GUEST_WRITE_LIMIT.limit + 5; i++) {
+    const res = await request.patch("/api/respondents", {
+      data: { notes: `spam ${i}` },
+      failOnStatusCode: false,
+    });
+    if (res.status() === 429) {
+      sawLimit = true;
+      expect(res.headers()["retry-after"]).toBeTruthy();
+      break;
+    }
+    // 404 is expected: this context has no identity cookie. What matters is
+    // that the limiter runs before the handler, so an unauthenticated
+    // flood is throttled just the same.
+    expect([200, 404]).toContain(res.status());
+  }
+  expect(sawLimit).toBe(true);
+});

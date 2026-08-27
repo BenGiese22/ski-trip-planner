@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { replaceAvailability } from "@/db/queries";
-import { badRequest, noSuchRespondent, readJson } from "@/lib/api";
+import { badRequest, noSuchRespondent, guestWriteLimit, readJson } from "@/lib/api";
 import { availabilityBulkSchema } from "@/lib/schemas";
 import { currentRespondent, loadClientResponse } from "@/lib/serverSession";
 
@@ -10,6 +10,9 @@ import { currentRespondent, loadClientResponse } from "@/lib/serverSession";
  * payload — see replaceAvailability for why that rules out a plain upsert.
  */
 export async function POST(request: Request) {
+  const limited = await guestWriteLimit(request);
+  if (limited) return limited;
+
   const respondent = await currentRespondent();
   if (!respondent) return noSuchRespondent();
 

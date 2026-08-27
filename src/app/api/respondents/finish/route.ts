@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAvailability, getDestinationRanking, markSubmitted } from "@/db/queries";
-import { noSuchRespondent } from "@/lib/api";
+import { guestWriteLimit, noSuchRespondent } from "@/lib/api";
 import { finishProblems } from "@/lib/finish";
 import { currentRespondent, loadClientResponse } from "@/lib/serverSession";
 
@@ -13,7 +13,10 @@ import { currentRespondent, loadClientResponse } from "@/lib/serverSession";
  * This is the one place validation is fair to apply, so it's the only write
  * path that can refuse.
  */
-export async function POST() {
+export async function POST(request: Request) {
+  const limited = await guestWriteLimit(request);
+  if (limited) return limited;
+
   const respondent = await currentRespondent();
   if (!respondent) return noSuchRespondent();
 
