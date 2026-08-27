@@ -197,3 +197,75 @@ test("the tally lists every destination, including ones nobody picked", async ({
   // Ranking's payoff: the full spread, not just the headline count.
   await expect(page.getByText(/average rank/).first()).toBeVisible();
 });
+
+test("the cost rollup prices each person and totals the group", async ({
+  page,
+  browser,
+}) => {
+  // Two guests, different airports and destinations, one bringing a plus-one —
+  // so the total genuinely has to span people rather than echo one row.
+  const guests = [
+    { name: "Ana", airport: "SFO", dest: "steamboat", plusOne: false },
+    { name: "Cara", airport: "ORD", dest: "summitCounty", plusOne: true },
+  ];
+
+  for (const g of guests) {
+    const ctx = await browser.newContext();
+    const p = await ctx.newPage();
+    await p.goto("/");
+    await p.getByLabel("Your name").fill(g.name);
+    await p.getByLabel("Email").fill(`${g.name.toLowerCase()}@example.com`);
+    await p.getByLabel("Coming solo or with someone?").selectOption(String(g.plusOne));
+    await p.getByLabel("Home airport").selectOption(g.airport);
+    await p.getByLabel("How comfortable are you on snow?").selectOption("intermediate");
+    await p.getByRole("button", { name: /start my response/i }).click();
+    await expect(p.getByRole("heading", { name: /welcome back/i })).toBeVisible();
+
+    await pickDestination(p, g.dest);
+    await p.getByRole("button", { name: /Thu Jan 28 – Sun Jan 31/ }).click();
+
+    const you = p.getByRole("group", { name: "You", exact: true });
+    await you.getByRole("button", { name: "2 days" }).click();
+    await you.getByRole("button", { name: /i need gear/i }).click();
+    if (g.plusOne) {
+      const partner = p.getByRole("group", { name: "Your plus-one" });
+      await partner.getByRole("button", { name: "2 days" }).click();
+      await partner.getByRole("button", { name: /bringing their own gear/i }).click();
+    }
+    await p.getByRole("button", { name: /save & finish/i }).click();
+    await expect(p.getByRole("button", { name: /update my answer/i })).toBeVisible();
+    await ctx.close();
+  }
+
+  await signIn(page);
+
+  // Both people listed, each against their own airport and destination.
+  await expect(page.getByText("Ana", { exact: true })).toBeVisible();
+  await expect(page.getByText(/SFO · Steamboat Springs/)).toBeVisible();
+  await expect(page.getByText(/ORD · Summit County/)).toBeVisible();
+
+  // Three people across two rows — the plus-one has to count.
+  await expect(page.getByText(/3 people/)).toBeVisible();
+  await expect(page.getByText(/Everyone, together/)).toBeVisible();
+});
+
+// Section 17 decision 6: the assumption must be visible in Ben's view too, or
+// he reads an estimated figure as a stated one.
+test("a pass holder's assumption is flagged in the rollup", async ({ page, browser }) => {
+  const guest = await browser.newContext();
+  const guestPage = await guest.newPage();
+  await guestPage.goto("/");
+  await completeIntake(guestPage);
+  await pickDestination(guestPage, "summitCounty");
+  await guestPage.getByRole("button", { name: /Thu Jan 28 – Sun Jan 31/ }).click();
+  const you = guestPage.getByRole("group", { name: "You", exact: true });
+  await you.getByRole("button", { name: /i already have a pass/i }).click();
+  await you.getByRole("button", { name: /i need gear/i }).click();
+  await guestPage.getByRole("button", { name: /save & finish/i }).click();
+  await expect(guestPage.getByRole("button", { name: /update my answer/i })).toBeVisible();
+  await guest.close();
+
+  await signIn(page);
+  await expect(page.getByText("est.", { exact: true })).toBeVisible();
+  await expect(page.getByText(/assumed 2 ski days/i)).toBeVisible();
+});

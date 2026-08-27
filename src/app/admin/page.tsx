@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AdminCostRollup } from "@/components/AdminCostRollup";
 import { AdminDestinationTally } from "@/components/AdminDestinationTally";
 import { AdminHeatmap } from "@/components/AdminHeatmap";
 import { AdminLoginForm } from "@/components/AdminLoginForm";
@@ -7,8 +8,10 @@ import {
   availabilityCountsByDate,
   countSubmittedRespondents,
   listSubmittedDestinationRankings,
+  listSubmittedRespondentsWithTopChoice,
 } from "@/db/queries";
 import { isAdminAuthenticated } from "@/lib/adminServerSession";
+import { buildCostRollup } from "@/lib/adminCostRollup";
 import { buildHeatmap } from "@/lib/availabilityHeatmap";
 import { tallyDestinations } from "@/lib/destinationTally";
 
@@ -54,10 +57,11 @@ export default async function AdminPage() {
 }
 
 async function AdminDashboard() {
-  const [totalRespondents, counts, rankings] = await Promise.all([
+  const [totalRespondents, counts, rankings, costEntries] = await Promise.all([
     countSubmittedRespondents(),
     availabilityCountsByDate(),
     listSubmittedDestinationRankings(),
+    listSubmittedRespondentsWithTopChoice(),
   ]);
 
   return (
@@ -97,6 +101,21 @@ async function AdminDashboard() {
           </p>
         ) : (
           <AdminDestinationTally rows={tallyDestinations(rankings, totalRespondents)} />
+        )}
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-xl mb-1.5">What it adds up to</h2>
+        <p className="text-sm text-ink-soft max-w-[60ch] mb-4">
+          Per person, and for the group. Planning estimates, not quotes.
+        </p>
+        {totalRespondents === 0 ? (
+          <p className="text-sm text-ink-soft border border-line rounded-lg p-4">
+            No costs to add up yet — this fills in as people finish their
+            responses.
+          </p>
+        ) : (
+          <AdminCostRollup rollup={buildCostRollup(costEntries)} />
         )}
       </section>
     </div>

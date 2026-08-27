@@ -1,4 +1,4 @@
-import { eq, isNotNull, lt, sql } from "drizzle-orm";
+import { and, eq, isNotNull, lt, sql } from "drizzle-orm";
 import type { DestinationSlug } from "@/data/types";
 import type { DayCount } from "@/lib/availabilityHeatmap";
 import type { AvailabilityBulkInput, IntakeInput, RespondentPatch } from "@/lib/schemas";
@@ -251,4 +251,28 @@ export async function listSubmittedDestinationRankings(): Promise<DestinationSlu
     byRespondent.set(row.respondentId, list);
   }
   return [...byRespondent.values()];
+}
+
+/**
+ * Every finished respondent with whatever they ranked first, for the cost
+ * rollup (§17 decision 3). Left join so someone with no ranking still appears
+ * — they'd be invisible in Ben's headcount otherwise.
+ */
+export async function listSubmittedRespondentsWithTopChoice(): Promise<
+  { respondent: Respondent; topChoice: DestinationSlug | null }[]
+> {
+  const rows = await getDb()
+    .select({ respondent: respondents, topChoice: destinationVotes.destinationSlug })
+    .from(respondents)
+    .leftJoin(
+      destinationVotes,
+      and(
+        eq(destinationVotes.respondentId, respondents.id),
+        eq(destinationVotes.rank, 1),
+      ),
+    )
+    .where(isNotNull(respondents.submittedAt))
+    .orderBy(respondents.createdAt);
+
+  return rows.map((row) => ({ respondent: row.respondent, topChoice: row.topChoice }));
 }
