@@ -1,8 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { databaseUrl, truncateAll } from "./database";
 import {
+  availabilityRows,
   completeIntake,
   dayCell,
+  destinationVotes,
   onlyRespondent,
   pickDestination,
   respondentCount,
@@ -20,7 +22,14 @@ test("a returning visitor's answers are still there after a reload", async ({ pa
 
   await pickDestination(page, "steamboat");
   await page.getByRole("button", { name: /Thu Jan 28 – Sun Jan 31/ }).click();
+
+  // Wait for every write to land before reloading. Polling only the
+  // respondent row confirmed the intake POST, not the ranking or availability
+  // writes that follow it — so the reload could outrun them and the test
+  // would fail on data that was merely still in flight.
   await expect.poll(async () => (await onlyRespondent()).name).toBe("Jamie Rivera");
+  await expect.poll(async () => (await destinationVotes()).length).toBe(3);
+  await expect.poll(async () => (await availabilityRows()).length).toBe(4);
 
   await page.reload();
 

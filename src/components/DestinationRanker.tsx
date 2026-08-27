@@ -28,6 +28,7 @@ export function DestinationRanker() {
   // Focus has to follow a card that moved, or keyboard reordering loses the
   // user's place after every press.
   const pendingFocus = useRef<DestinationSlug | null>(null);
+  const orderRef = useRef<DestinationSlug[]>(DEFAULT_ORDER);
   useEffect(() => {
     if (!pendingFocus.current) return;
     document
@@ -43,18 +44,28 @@ export function DestinationRanker() {
   const ranked = (response?.destinationRanking.length ?? 0) > 0;
   const order = ranked ? response!.destinationRanking : DEFAULT_ORDER;
 
+  // Two presses in quick succession both read the same render's `order`, so
+  // the second recomputed the first move instead of continuing it — pressing
+  // "up" twice left the card one place higher, not two. Handlers read the ref
+  // instead, and commit() advances it, so consecutive moves compose.
+  useEffect(() => {
+    orderRef.current = order;
+  }, [order]);
+
   function commit(next: DestinationSlug[], moved: DestinationSlug) {
+    orderRef.current = next;
     update({ destinationRanking: next }, { immediate: true });
     const name = destinations.find((d) => d.slug === moved)?.name ?? moved;
     setAnnouncement(`${name} moved to ${ORDINALS[next.indexOf(moved)]} choice.`);
   }
 
   function move(slug: DestinationSlug, delta: number) {
-    const from = order.indexOf(slug);
+    const current = orderRef.current;
+    const from = current.indexOf(slug);
     const to = from + delta;
-    if (to < 0 || to >= order.length) return;
+    if (to < 0 || to >= current.length) return;
 
-    const next = [...order];
+    const next = [...current];
     [next[from], next[to]] = [next[to], next[from]];
     pendingFocus.current = slug;
     commit(next, slug);
@@ -62,8 +73,9 @@ export function DestinationRanker() {
 
   function dropOn(target: DestinationSlug) {
     if (!dragging || dragging === target) return;
-    const next = order.filter((slug) => slug !== dragging);
-    next.splice(order.indexOf(target), 0, dragging);
+    const current = orderRef.current;
+    const next = current.filter((slug) => slug !== dragging);
+    next.splice(current.indexOf(target), 0, dragging);
     commit(next, dragging);
     setDragging(null);
   }

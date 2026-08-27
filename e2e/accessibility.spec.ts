@@ -63,7 +63,7 @@ test("the signed-in admin view has none either, empty", async ({ page }) => {
 // The empty dashboard never renders the heatmap, so the scan above never sees
 // the density ramp — and the ramp is exactly where a contrast failure would
 // hide, since the in-cell numerals sit on five different backgrounds.
-test("the heatmap's density ramp holds contrast at every tier", async ({
+test("the fully populated admin view is clean, ramp and all", async ({
   page,
   browser,
 }) => {

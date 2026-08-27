@@ -57,16 +57,24 @@ export function ResponseProvider({
   const [response, setResponse] = useState<ClientResponse | null>(initialResponse);
   const [problems, setProblems] = useState<FinishProblem[]>([]);
 
+  /**
+   * Autosave responses are deliberately *not* written back into state. The
+   * optimistic update already applied the change, and the reply describes the
+   * row as it was when that request was handled — so a second edit made while
+   * the first was in flight would be silently reverted by the first reply.
+   * Ranking two positions in quick succession reproduced exactly that.
+   *
+   * The server is still the source of truth on load, and after "Save &
+   * finish", which is where its reply is applied.
+   */
   const fields = useAutosave<RespondentPatch>(async (patch) => {
-    const { response: saved } = await postJson("/api/respondents", patch, "PATCH");
-    setResponse(saved);
+    await postJson("/api/respondents", patch, "PATCH");
   });
 
   const availability = useAutosave<{ entries: AvailabilityEntry[] }>(async (patch) => {
     // Merge semantics land exactly right here: `entries` is the whole set, so
     // the newest write wins, which is what replace-all wants.
-    const { response: saved } = await postJson("/api/availability", patch);
-    setResponse(saved);
+    await postJson("/api/availability", patch);
   });
 
   const startResponse = useCallback(async (intake: IntakeInput) => {

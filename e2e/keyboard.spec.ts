@@ -4,6 +4,7 @@ import {
   availabilityRows,
   completeIntake,
   dayCell,
+  destinationVotes,
   onlyRespondent,
   pickDestination,
 } from "./helpers";
@@ -99,4 +100,61 @@ test("the ski-days and gear toggles announce their state and work from the keybo
 
   await expect(threeDays).toHaveAttribute("aria-pressed", "true");
   await expect.poll(async () => (await onlyRespondent()).ski_days).toBe(3);
+});
+
+// Drag-and-drop is unreachable by keyboard, so these buttons are the whole
+// accessible path to ranking — not a convenience (§17 decision 3).
+test("destinations can be ranked entirely from the keyboard", async ({ page }) => {
+  await page.goto("/");
+  await completeIntake(page);
+
+  const up = page.getByRole("button", { name: /Move Winter Park up/ });
+  await up.focus();
+  await expect(up).toBeFocused();
+
+  const outline = await up.evaluate((el) => getComputedStyle(el).outlineStyle);
+  expect(outline).not.toBe("none");
+
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("rank-badge-winterPark")).toHaveText("2nd choice");
+
+  // Focus must follow the card that moved, or every press loses your place
+  // and you have to hunt for the button again.
+  await expect(page.getByRole("button", { name: /Move Winter Park up/ })).toBeFocused();
+
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("rank-badge-winterPark")).toHaveText("1st choice");
+
+  // Now first, so it can't go higher.
+  await expect(page.getByRole("button", { name: /Move Winter Park up/ })).toBeDisabled();
+});
+
+test("a reorder is announced, not just shown", async ({ page }) => {
+  await page.goto("/");
+  await completeIntake(page);
+
+  await page.getByRole("button", { name: /Move Winter Park up/ }).click();
+
+  // A visual reshuffle tells a screen-reader user nothing on its own.
+  await expect(page.getByRole("status")).toContainText(/Winter Park moved to 2nd choice/i);
+});
+
+test("the ranking persists as an ordering, not just a single pick", async ({ page }) => {
+  await page.goto("/");
+  await completeIntake(page);
+
+  await page.getByRole("button", { name: /Move Winter Park up/ }).click();
+  await page.getByRole("button", { name: /Move Winter Park up/ }).click();
+  await expect(page.getByTestId("rank-badge-winterPark")).toHaveText("1st choice");
+
+  // The badge is optimistic. Wait for the write to land before reloading —
+  // otherwise this races autosave rather than testing persistence.
+  await expect
+    .poll(async () => (await destinationVotes()).find((v) => v.rank === 1)?.destination_slug)
+    .toBe("winterPark");
+
+  await page.reload();
+  await expect(page.getByTestId("rank-badge-winterPark")).toHaveText("1st choice");
+  await expect(page.getByTestId("rank-badge-steamboat")).toHaveText("2nd choice");
+  await expect(page.getByTestId("rank-badge-summitCounty")).toHaveText("3rd choice");
 });
