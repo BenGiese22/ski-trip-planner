@@ -30,6 +30,25 @@ something to reuse.
   drafted in PLAN.md section 4 — noted inline there. Everything else in the
   data model (section 5) applies as written.
 
+## Environment variables
+
+Production is the only environment that matters here — there are no preview
+or development deploys to keep in sync, and pushes to `main` deploy straight
+to production.
+
+- `ADMIN_PASSCODE` and `ADMIN_COOKIE_SECRET` live in **Vercel Production and
+  in `.env.local` only**, on purpose. Don't add them to the preview or
+  development environments.
+- **`vercel env pull` overwrites `.env.local`.** Because the two admin secrets
+  aren't on the development target, a pull silently drops them, and `npm run
+  dev` then rejects the correct passcode — which reads as a wrong password
+  rather than missing config. If you pull, re-add both lines afterwards.
+- `POSTGRES_URL` / `POSTGRES_URL_NON_POOLING` *are* on the development target,
+  which is the only reason `vercel env pull` can retrieve them at all — see
+  PLAN.md section 12 for why sensitive vars are otherwise unreadable.
+- Tests need none of this: the e2e suite supplies its own committed throwaway
+  passcode and cookie secret, and runs against a throwaway Postgres.
+
 ## Commands
 
 - `npm run dev` — local dev server
