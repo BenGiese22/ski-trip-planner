@@ -28,10 +28,24 @@ const loginSchema = z.strictObject({
  * not in a later hardening pass).
  */
 export async function POST(request: Request) {
-  const limit = await hitRateLimit(
-    bucketKey("admin-login", clientIdFromRequest(request)),
-    ADMIN_LOGIN_LIMIT,
-  );
+  // The limiter lives in Postgres, so a database outage would otherwise throw
+  // here and surface as an unhandled 500 before the passcode is even read.
+  // Fail closed rather than open: skipping the limit when the store is
+  // unreachable would hand an attacker a trivial bypass, and the dashboard
+  // needs that same database anyway, so letting anyone in would achieve
+  // nothing.
+  let limit;
+  try {
+    limit = await hitRateLimit(
+      bucketKey("admin-login", clientIdFromRequest(request)),
+      ADMIN_LOGIN_LIMIT,
+    );
+  } catch {
+    return NextResponse.json(
+      { error: "Can't reach the database right now. Try again in a moment." },
+      { status: 503 },
+    );
+  }
 
   if (!limit.allowed) {
     return NextResponse.json(

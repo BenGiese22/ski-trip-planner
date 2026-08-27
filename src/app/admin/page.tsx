@@ -57,12 +57,31 @@ export default async function AdminPage() {
 }
 
 async function AdminDashboard() {
-  const [totalRespondents, counts, rankings, costEntries] = await Promise.all([
-    countSubmittedRespondents(),
-    availabilityCountsByDate(),
-    listSubmittedDestinationRankings(),
-    listSubmittedRespondentsWithTopChoice(),
-  ]);
+  // A database that's briefly unreachable should read as a temporary hiccup in
+  // this page's own voice, not as Next's default error screen — and certainly
+  // not as "0 responses", which would look like nobody had replied (§14 counts
+  // error states as part of done).
+  let data;
+  try {
+    const [totalRespondents, counts, rankings, costEntries] = await Promise.all([
+      countSubmittedRespondents(),
+      availabilityCountsByDate(),
+      listSubmittedDestinationRankings(),
+      listSubmittedRespondentsWithTopChoice(),
+    ]);
+    data = { totalRespondents, counts, rankings, costEntries };
+  } catch {
+    return (
+      <div data-testid="admin-dashboard">
+        <p className="text-sm text-ink border border-rust bg-[#F6DAD6] rounded-lg p-4 max-w-[60ch]">
+          Couldn&rsquo;t load the responses just now — the database didn&rsquo;t
+          answer. Nothing is lost; try reloading in a moment.
+        </p>
+      </div>
+    );
+  }
+
+  const { totalRespondents, counts, rankings, costEntries } = data;
 
   return (
     <div data-testid="admin-dashboard">
