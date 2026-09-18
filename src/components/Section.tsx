@@ -14,8 +14,11 @@ export function Section({
   children: ReactNode;
 }) {
   return (
-    <section id={id} className="relative pl-11 sm:pl-[52px] mb-16 scroll-mt-6">
-      <div className="absolute left-0 top-0.5 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-paper border-2 border-pine flex items-center justify-center font-mono text-[12px] sm:text-[13px] font-semibold text-pine">
+    <section id={id} className="relative sm:pl-[52px] mb-16 scroll-mt-6">
+      {/* Static above the heading below sm instead of absolutely positioned —
+          absolute would otherwise reserve ~50px of horizontal width from a
+          budget a narrow phone doesn't have. */}
+      <div className="inline-flex w-9 h-9 rounded-full bg-paper border-2 border-pine items-center justify-center font-mono text-[13px] font-semibold text-pine mb-2 sm:mb-0 sm:absolute sm:left-0 sm:top-0.5">
         {number}
       </div>
       <h2 className="text-2xl mb-1.5">{title}</h2>
