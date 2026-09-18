@@ -46,7 +46,7 @@ function parseDraft(draft: Draft) {
 }
 
 export function IntakeForm() {
-  const { response, startResponse, update } = useResponse();
+  const { response, loadFailed, startResponse, update } = useResponse();
   const [draft, setDraft] = useState<Draft>(() => draftFrom(response));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -186,7 +186,7 @@ export function IntakeForm() {
         </div>
       </div>
 
-      {!started && (
+      {!started && !loadFailed && (
         <div className="mt-4 flex items-center gap-3 flex-wrap">
           <button
             type="submit"

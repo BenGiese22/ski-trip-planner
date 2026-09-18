@@ -48,6 +48,16 @@ describe("WelcomeBack", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("shows a notice instead of nothing when the initial load failed", () => {
+    render(
+      <ResponseProvider initialResponse={null} loadFailed>
+        <WelcomeBack />
+      </ResponseProvider>,
+    );
+    expect(screen.getByText(/load your saved answers/i)).toBeVisible();
+    expect(screen.getByText(/everything below is still readable/i)).toBeVisible();
+  });
+
   it("counts only days the person can actually make", () => {
     renderWith(
       response({

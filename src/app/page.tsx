@@ -11,7 +11,7 @@ import { Section } from "@/components/Section";
 import { SourceLine } from "@/components/SourceLine";
 import { WelcomeBack } from "@/components/WelcomeBack";
 import { passInfo, passSources } from "@/data/passInfo";
-import { currentRespondent, loadClientResponse } from "@/lib/serverSession";
+import { currentRespondent, loadClientResponse, type ClientResponse } from "@/lib/serverSession";
 
 /**
  * There's no /me route (section 16, decision 1). This page reads the identity
@@ -21,13 +21,27 @@ import { currentRespondent, loadClientResponse } from "@/lib/serverSession";
  * Reading the cookie makes the page dynamic. At this scale that's the right
  * trade — the alternative is splitting the shell from the personalised parts
  * to keep a static prerender that saves nothing measurable for a dozen guests.
+ *
+ * A returning guest's cookie only exists once a row does (decision 7), so a
+ * failure here always means "this guest has a saved response we can't reach
+ * right now" — never a genuine first-time visitor, since `currentRespondent`
+ * returns null without querying anything when there's no cookie to resolve.
+ * The reference content has to stay readable regardless (PLAN.md section 14),
+ * so a thrown query — the database being unreachable — degrades to the
+ * first-visit shell plus a notice, not a broken page.
  */
 export default async function Home() {
-  const respondent = await currentRespondent();
-  const response = respondent ? await loadClientResponse(respondent) : null;
+  let response: ClientResponse | null = null;
+  let loadFailed = false;
+  try {
+    const respondent = await currentRespondent();
+    response = respondent ? await loadClientResponse(respondent) : null;
+  } catch {
+    loadFailed = true;
+  }
 
   return (
-    <ResponseProvider initialResponse={response}>
+    <ResponseProvider initialResponse={response} loadFailed={loadFailed}>
       <Hero />
       <main className="w-full min-w-0 max-w-[980px] mx-auto px-6 py-14">
         <Section

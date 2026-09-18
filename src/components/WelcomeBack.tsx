@@ -8,7 +8,20 @@ import { useResponse } from "./ResponseProvider";
  * the "we know who you are" header above the editable form.
  */
 export function WelcomeBack() {
-  const { response } = useResponse();
+  const { response, loadFailed } = useResponse();
+
+  if (loadFailed) {
+    return (
+      <div className="bg-[#FBEDCB] border border-gold rounded-xl p-5 mb-3.5">
+        <p className="text-sm text-ink">
+          Couldn&rsquo;t load your saved answers just now — everything below
+          is still readable. Reload in a minute to pick up where you left
+          off.
+        </p>
+      </div>
+    );
+  }
+
   if (!response) return null;
 
   const firstName = response.name.trim().split(/\s+/)[0];

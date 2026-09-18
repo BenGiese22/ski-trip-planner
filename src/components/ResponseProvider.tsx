@@ -18,6 +18,9 @@ export type AvailabilityEntry = { date: string; status: AvailabilityStatus };
 
 type ResponseContextValue = {
   response: ClientResponse | null;
+  /** True when the server-side load threw (e.g. the database is unreachable),
+   * as opposed to a genuine first-time visitor with no saved response. */
+  loadFailed: boolean;
   status: SaveStatus;
   lastSavedAt: number | null;
   problems: FinishProblem[];
@@ -49,9 +52,11 @@ async function postJson(url: string, body: unknown, method = "POST") {
 
 export function ResponseProvider({
   initialResponse,
+  loadFailed = false,
   children,
 }: {
   initialResponse: ClientResponse | null;
+  loadFailed?: boolean;
   children: ReactNode;
 }) {
   const [response, setResponse] = useState<ClientResponse | null>(initialResponse);
@@ -155,6 +160,7 @@ export function ResponseProvider({
   const value = useMemo<ResponseContextValue>(
     () => ({
       response,
+      loadFailed,
       status,
       lastSavedAt: Math.max(fields.lastSavedAt ?? 0, availability.lastSavedAt ?? 0) || null,
       problems,
@@ -165,6 +171,7 @@ export function ResponseProvider({
     }),
     [
       response,
+      loadFailed,
       status,
       fields.lastSavedAt,
       availability.lastSavedAt,
