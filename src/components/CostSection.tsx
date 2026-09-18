@@ -143,9 +143,11 @@ function Breakdown({
       </div>
 
       {breakdown.people.length > 1 && (
-        <div className="flex justify-between px-4 py-2.5 text-sm font-semibold bg-pine text-snow rounded-lg mt-3">
-          <span>Both of you, together</span>
-          <span className="font-mono">{formatUsdRange(breakdown.total)}</span>
+        <div className="flex justify-between gap-3 px-4 py-2.5 text-sm font-semibold bg-pine text-snow rounded-lg mt-3">
+          <span className="min-w-0">Both of you, together</span>
+          <span className="font-mono shrink-0 whitespace-nowrap">
+            {formatUsdRange(breakdown.total)}
+          </span>
         </div>
       )}
 
@@ -181,15 +183,19 @@ function CostTable({ estimate }: { estimate: TripCostEstimate }) {
       {estimate.lineItems.map((item) => (
         <div
           key={item.label}
-          className="flex justify-between px-4 py-2.5 text-sm border-b border-line last:border-b-0"
+          className="flex justify-between gap-3 px-4 py-2.5 text-sm border-b border-line last:border-b-0"
         >
-          <span>{item.label}</span>
-          <span className="font-mono text-ink-soft">{formatUsdRange(item.range)}</span>
+          <span className="min-w-0">{item.label}</span>
+          <span className="font-mono text-ink-soft shrink-0 whitespace-nowrap">
+            {formatUsdRange(item.range)}
+          </span>
         </div>
       ))}
-      <div className="flex justify-between px-4 py-2.5 text-sm font-semibold bg-pine text-snow">
-        <span>Estimated total, per person</span>
-        <span className="font-mono">{formatUsdRange(estimate.total)}</span>
+      <div className="flex justify-between gap-3 px-4 py-2.5 text-sm font-semibold bg-pine text-snow">
+        <span className="min-w-0">Estimated total, per person</span>
+        <span className="font-mono shrink-0 whitespace-nowrap">
+          {formatUsdRange(estimate.total)}
+        </span>
       </div>
     </div>
   );

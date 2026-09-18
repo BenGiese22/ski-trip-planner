@@ -43,7 +43,7 @@ export default async function Home() {
   return (
     <ResponseProvider initialResponse={response} loadFailed={loadFailed}>
       <Hero />
-      <main className="w-full min-w-0 max-w-[980px] mx-auto px-6 py-14">
+      <main className="w-full min-w-0 max-w-[980px] mx-auto px-4 sm:px-6 py-14">
         <Section
           id="you"
           number="01"

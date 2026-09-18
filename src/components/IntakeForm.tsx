@@ -11,8 +11,10 @@ const SKI_LEVELS = [
   { value: "advanced", label: "Advanced" },
 ] as const;
 
+// text-base (16px), not text-sm: iOS Safari zooms the whole page in on focus
+// for any input/select under 16px, which then has to be pinch-zoomed back out.
 const fieldClasses =
-  "w-full border border-line rounded-md px-3 py-2.5 text-sm bg-paper text-ink " +
+  "w-full border border-line rounded-md px-3 py-2.5 text-base sm:text-sm bg-paper text-ink " +
   "focus:outline-2 focus:outline-offset-2 focus:outline-pine";
 
 const labelClasses = "block font-mono text-[11px] uppercase tracking-wide text-ink-soft mb-1.5";

@@ -157,13 +157,13 @@ export function AvailabilityGrid() {
 
   return (
     <div>
-      <div className="flex gap-2.5 flex-wrap mb-4">
+      <div className="flex flex-col sm:flex-row gap-2.5 sm:flex-wrap mb-4">
         {quickPicks.map((pick) => (
           <button
             key={pick.label}
             type="button"
             onClick={() => applyQuickPick(pick.dates)}
-            className="text-sm border border-line rounded-lg px-3 py-2 bg-paper hover:border-gold focus:outline-2 focus:outline-offset-2 focus:outline-pine"
+            className="w-full sm:w-auto text-sm border border-line rounded-lg px-3 py-2 bg-paper hover:border-gold focus:outline-2 focus:outline-offset-2 focus:outline-pine"
           >
             {pick.label} <span className="text-ink-soft">({pick.note})</span>
           </button>
