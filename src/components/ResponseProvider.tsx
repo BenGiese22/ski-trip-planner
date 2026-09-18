@@ -30,6 +30,8 @@ type ResponseContextValue = {
   update: (patch: RespondentPatch, options?: { immediate?: boolean }) => void;
   setAvailability: (entries: AvailabilityEntry[]) => void;
   finish: () => Promise<{ ok: boolean }>;
+  /** Manual "Retry" — flushes whichever saver(s) are sitting in error. */
+  retry: () => void;
 };
 
 const ResponseContext = createContext<ResponseContextValue | null>(null);
@@ -147,6 +149,11 @@ export function ResponseProvider({
     return { ok: true };
   }, [fields, availability]);
 
+  const retry = useCallback(() => {
+    void fields.flush();
+    void availability.flush();
+  }, [fields, availability]);
+
   // One indicator for two savers: an error anywhere is an error, and a save
   // anywhere in flight reads as saving.
   const status: SaveStatus = useMemo(() => {
@@ -168,6 +175,7 @@ export function ResponseProvider({
       update,
       setAvailability,
       finish,
+      retry,
     }),
     [
       response,
@@ -180,6 +188,7 @@ export function ResponseProvider({
       update,
       setAvailability,
       finish,
+      retry,
     ],
   );
 

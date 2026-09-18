@@ -243,6 +243,30 @@ describe("useAutosave", () => {
     expect(result.current.status).toBe("saved");
   });
 
+  // The bug this pins: attempts never reset after an error, so the very next
+  // save attempt (triggered by a fresh edit) had zero retry budget left and
+  // went straight back to "error" on a single failure — silently breaking the
+  // "we'll keep trying" promise the UI makes.
+  it("gives a new edit a full retry budget after a prior error exhausted one", async () => {
+    const save = vi.fn().mockRejectedValue(new Error("network"));
+    const { result } = renderHook(() => useAutosave<Patch>(save, { maxRetries: 2 }));
+
+    act(() => result.current.queue({ notes: "a" }));
+    await advance(AUTOSAVE_DELAY_MS);
+    await advance(30_000);
+    expect(result.current.status).toBe("error");
+
+    // One failure, then success — should recover via retry, not go straight
+    // back to "error", since this is a fresh edit with its own retry budget.
+    save.mockRejectedValueOnce(new Error("network")).mockResolvedValue(undefined);
+    act(() => result.current.queue({ notes: "b" }));
+    await advance(AUTOSAVE_DELAY_MS);
+    expect(result.current.status).not.toBe("error");
+
+    await advance(5_000);
+    expect(result.current.status).toBe("saved");
+  });
+
   it("does not fire a pending save after unmount", async () => {
     const save = vi.fn().mockResolvedValue(undefined);
     const { result, unmount } = renderHook(() => useAutosave<Patch>(save));

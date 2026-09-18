@@ -7,7 +7,7 @@ const STATUS_COPY = {
   idle: "Every answer saves itself as you go",
   saving: "Saving…",
   saved: "Saved",
-  error: "Couldn't save — we'll keep trying",
+  error: "Couldn't save your last change",
 } as const;
 
 function agoLabel(timestamp: number): string {
@@ -24,7 +24,7 @@ function agoLabel(timestamp: number): string {
  * through the cost calculator (PLAN.md section 6).
  */
 export function SaveBar() {
-  const { response, status, lastSavedAt, problems, finish } = useResponse();
+  const { response, status, lastSavedAt, problems, finish, retry } = useResponse();
   const [finishing, setFinishing] = useState(false);
   const [, forceTick] = useState(0);
 
@@ -63,18 +63,30 @@ export function SaveBar() {
           {submitted ? " · marked as final" : ""}
         </p>
 
-        <button
-          type="button"
-          disabled={finishing}
-          onClick={async () => {
-            setFinishing(true);
-            await finish();
-            setFinishing(false);
-          }}
-          className="text-sm bg-gold text-[#2B1D02] font-semibold px-4 py-2 rounded-md hover:bg-[#C68C0F] disabled:opacity-60 focus:outline-2 focus:outline-offset-2 focus:outline-snow"
-        >
-          {finishing ? "Saving…" : submitted ? "Update my answer" : "Save & finish →"}
-        </button>
+        <div className="flex items-center gap-3 flex-wrap">
+          {status === "error" && (
+            <button
+              type="button"
+              onClick={retry}
+              className="text-sm text-snow underline underline-offset-2 hover:text-[#CFE0D5] focus:outline-2 focus:outline-offset-2 focus:outline-snow"
+            >
+              Retry
+            </button>
+          )}
+
+          <button
+            type="button"
+            disabled={finishing}
+            onClick={async () => {
+              setFinishing(true);
+              await finish();
+              setFinishing(false);
+            }}
+            className="text-sm bg-gold text-[#2B1D02] font-semibold px-4 py-2 rounded-md hover:bg-[#C68C0F] disabled:opacity-60 focus:outline-2 focus:outline-offset-2 focus:outline-snow"
+          >
+            {finishing ? "Saving…" : submitted ? "Update my answer" : "Save & finish →"}
+          </button>
+        </div>
       </div>
     </div>
   );
