@@ -35,14 +35,11 @@ export function Hero() {
           Colorado ski weekend, late winter 2027
         </h1>
         <p className="text-[#CFE0D5] text-base max-w-[52ch] mt-3.5">
-          Megan and I already have the Ikon Base Pass, so we&rsquo;re looking at a
-          trip built around resorts that pass already covers — everyone else
-          can grab a short Ikon Session Pass for just the days they&rsquo;ll ski.
-          This page is here to get a read on who&rsquo;s actually interested and
-          which dates could work, nothing&rsquo;s locked in yet. (Small bonus: the
-          window we&rsquo;re circling happens to land right around Ben&rsquo;s
-          birthday — worth trying to line up for, but not the reason for the
-          trip.)
+          Megan and I already have the Ikon Base Pass, so we&rsquo;re looking at
+          resorts that pass covers — everyone else can grab a short Ikon
+          Session Pass for just the days they&rsquo;ll ski. This page is here to
+          get a read on who&rsquo;s interested and which dates could work;
+          nothing&rsquo;s locked in yet.
         </p>
         <div className="flex gap-7 mt-8 flex-wrap">
           <div>
