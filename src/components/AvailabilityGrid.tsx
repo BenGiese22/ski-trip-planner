@@ -177,11 +177,16 @@ export function AvailabilityGrid() {
       </p>
 
       <div
-        className="grid grid-cols-1 sm:grid-cols-3 gap-4 select-none"
-        // Painting is driven by pointer events on the cells; suppressing the
-        // browser's own drag/scroll gesture keeps a drag from turning into a
-        // text selection or a page scroll mid-paint.
-        style={{ touchAction: painting ? "none" : undefined }}
+        // Static, not gated on `painting`: touch-action is decided once, at
+        // the very first touchstart of a sequence, before React ever gets a
+        // chance to re-render — setting it only once painting is already
+        // true is always one gesture too late, and the browser has already
+        // started treating the drag as a native pan by then. `pan-y` keeps
+        // vertical scrolling native (so the page never gets stuck) while
+        // still leaving horizontal touch drags — the common case, painting
+        // a run of days in one week — to our own pointer handling instead of
+        // the browser's.
+        className="grid grid-cols-1 sm:grid-cols-3 gap-4 select-none touch-pan-y"
       >
         {grids.map((grid) => (
           <div key={grid.label}>
