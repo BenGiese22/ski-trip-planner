@@ -29,7 +29,7 @@ type ResponseContextValue = {
   /** Debounced autosave. Pass immediate for selects, toggles and blur. */
   update: (patch: RespondentPatch, options?: { immediate?: boolean }) => void;
   setAvailability: (entries: AvailabilityEntry[]) => void;
-  finish: () => Promise<{ ok: boolean }>;
+  finish: () => Promise<{ ok: boolean; message?: string }>;
   /** Manual "Retry" — flushes whichever saver(s) are sitting in error. */
   retry: () => void;
 };
@@ -129,24 +129,46 @@ export function ResponseProvider({
   );
 
   const finish = useCallback(async () => {
-    // Await, don't just trigger: the server is about to validate this row for
-    // completeness, so every pending write has to have landed first. Firing
-    // and hoping loses the race on a slow connection, and the person gets
-    // told to fill in answers they already gave.
-    await Promise.all([fields.flush(), availability.flush()]);
+    try {
+      // Await, don't just trigger: the server is about to validate this row
+      // for completeness, so every pending write has to have landed first.
+      // Firing and hoping loses the race on a slow connection, and the person
+      // gets told to fill in answers they already gave.
+      await Promise.all([fields.flush(), availability.flush()]);
 
-    const res = await fetch("/api/respondents/finish", { method: "POST" });
-    if (res.status === 422) {
+      const res = await fetch("/api/respondents/finish", { method: "POST" });
+      if (res.status === 422) {
+        const body = await res.json();
+        setProblems(body.problems ?? []);
+        return { ok: false };
+      }
+      if (!res.ok) {
+        // The API's own error bodies are already written for a guest to
+        // read (rate limit, no-such-respondent, DB unreachable) — prefer
+        // them over a generic message when they're there.
+        let message = "Couldn't save that just now — try again in a moment.";
+        try {
+          const body = await res.json();
+          if (typeof body?.error === "string") message = body.error;
+        } catch {
+          // Non-JSON error body (a raw 500, say) — the generic message stands.
+        }
+        return { ok: false, message };
+      }
+
       const body = await res.json();
-      setProblems(body.problems ?? []);
-      return { ok: false };
+      setResponse(body.response);
+      setProblems([]);
+      return { ok: true };
+    } catch {
+      // A thrown fetch (offline, DNS failure) must still resolve — a
+      // rejected promise here left the "Save & finish" button stuck on
+      // "Saving…" forever, since nothing downstream ever ran.
+      return {
+        ok: false,
+        message: "Couldn't reach the server — check your connection and try again.",
+      };
     }
-    if (!res.ok) return { ok: false };
-
-    const body = await res.json();
-    setResponse(body.response);
-    setProblems([]);
-    return { ok: true };
   }, [fields, availability]);
 
   const retry = useCallback(() => {

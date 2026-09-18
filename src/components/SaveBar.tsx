@@ -26,6 +26,7 @@ function agoLabel(timestamp: number): string {
 export function SaveBar() {
   const { response, status, lastSavedAt, problems, finish, retry } = useResponse();
   const [finishing, setFinishing] = useState(false);
+  const [finishError, setFinishError] = useState<string | null>(null);
   const [, forceTick] = useState(0);
 
   // Keeps "saved just now" from going stale while the page sits open.
@@ -54,6 +55,12 @@ export function SaveBar() {
         </div>
       )}
 
+      {finishError && (
+        <div role="alert" className="max-w-[980px] mx-auto px-6 pt-3">
+          <p className="text-[13px] text-[#F6DAD6]">{finishError}</p>
+        </div>
+      )}
+
       <div className="max-w-[980px] mx-auto px-6 py-3 flex items-center justify-between gap-4 flex-wrap">
         <p className="text-xs text-[#AEC4B7]" aria-live="polite">
           <span className={status === "error" ? "text-[#F6DAD6]" : "text-[#CFE0D5]"}>
@@ -79,8 +86,17 @@ export function SaveBar() {
             disabled={finishing}
             onClick={async () => {
               setFinishing(true);
-              await finish();
-              setFinishing(false);
+              setFinishError(null);
+              try {
+                const result = await finish();
+                if (!result.ok && result.message) setFinishError(result.message);
+              } catch {
+                // finish() resolves rather than rejects (see ResponseProvider),
+                // but the button still recovers cleanly if that ever changes.
+                setFinishError("Couldn't save that just now — try again in a moment.");
+              } finally {
+                setFinishing(false);
+              }
             }}
             className="text-sm bg-gold text-[#2B1D02] font-semibold px-4 py-2 rounded-md hover:bg-[#C68C0F] disabled:opacity-60 focus:outline-2 focus:outline-offset-2 focus:outline-snow"
           >

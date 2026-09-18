@@ -60,6 +60,20 @@ describe("SaveBar", () => {
     expect(retry).toHaveBeenCalledOnce();
   });
 
+  it("re-enables the finish button even when finish() rejects", async () => {
+    const finish = vi.fn().mockRejectedValue(new Error("network down"));
+    mockUseResponse({ finish });
+    render(<SaveBar />);
+
+    const button = screen.getByRole("button", { name: /save & finish/i });
+    fireEvent.click(button);
+
+    // Give the rejected promise a turn to settle.
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(screen.getByRole("button", { name: /save & finish/i })).toBeEnabled();
+  });
+
   it("shows no Retry control when nothing has failed", () => {
     mockUseResponse({ status: "saved", lastSavedAt: Date.now() });
     render(<SaveBar />);
