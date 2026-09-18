@@ -43,12 +43,31 @@ export function useResponse(): ResponseContextValue {
 }
 
 async function postJson(url: string, body: unknown, method = "POST") {
-  const res = await fetch(url, {
-    method,
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`${method} ${url} failed with ${res.status}`);
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new Error("Couldn't reach the server — check your connection and try again.");
+  }
+
+  if (!res.ok) {
+    // The API's own error bodies are already written for a guest to read
+    // (rate limit, no-such-respondent, DB unreachable) — prefer them over a
+    // generic status-code message when they're there.
+    let message = `${method} ${url} failed with ${res.status}`;
+    try {
+      const errorBody = await res.json();
+      if (typeof errorBody?.error === "string") message = errorBody.error;
+    } catch {
+      // Non-JSON error body (a raw 500, say) — the generic message stands.
+    }
+    throw new Error(message);
+  }
+
   return res.json();
 }
 
@@ -89,10 +108,13 @@ export function ResponseProvider({
       const { response: created } = await postJson("/api/respondents", intake);
       setResponse(created);
       return { ok: true };
-    } catch {
+    } catch (err) {
       return {
         ok: false,
-        message: "Couldn't save that just now — check your connection and try again.",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Couldn't save that just now — check your connection and try again.",
       };
     }
   }, []);

@@ -55,13 +55,26 @@ export function IntakeForm() {
 
   const started = response !== null;
 
-  function set<K extends keyof Draft>(key: K, value: string) {
+  // Selects/toggles flush immediately (section 6); text fields debounce
+  // through the same 700ms window as everything else and flush on blur —
+  // flushing on every keystroke was a full PATCH per character typed.
+  function set<K extends keyof Draft>(
+    key: K,
+    value: string,
+    options?: { immediate?: boolean },
+  ) {
     setDraft((current) => ({ ...current, [key]: value }));
 
     // Once the row exists every edit autosaves. Before that there's nothing to
     // save to yet — decision 7 defers row creation until intake is complete.
     if (!started) return;
     const parsed = parseDraft({ ...draft, [key]: value });
+    if (parsed.success) update(parsed.data, options);
+  }
+
+  function flushField() {
+    if (!started) return;
+    const parsed = parseDraft(draft);
     if (parsed.success) update(parsed.data, { immediate: true });
   }
 
@@ -105,6 +118,7 @@ export function IntakeForm() {
             aria-invalid={Boolean(errors.name)}
             aria-describedby={describedBy("name")}
             onChange={(e) => set("name", e.target.value)}
+            onBlur={flushField}
           />
           <FieldError id={`${ids}-name-error`} message={errors.name} />
         </div>
@@ -122,6 +136,7 @@ export function IntakeForm() {
             aria-invalid={Boolean(errors.email)}
             aria-describedby={describedBy("email")}
             onChange={(e) => set("email", e.target.value)}
+            onBlur={flushField}
           />
           <FieldError id={`${ids}-email-error`} message={errors.email} />
         </div>
@@ -134,7 +149,7 @@ export function IntakeForm() {
             id={`${ids}-plusOne`}
             className={fieldClasses}
             value={draft.plusOne}
-            onChange={(e) => set("plusOne", e.target.value)}
+            onChange={(e) => set("plusOne", e.target.value, { immediate: true })}
           >
             <option value="false">Just me</option>
             <option value="true">Me plus a partner</option>
@@ -151,7 +166,7 @@ export function IntakeForm() {
             value={draft.homeAirport}
             aria-invalid={Boolean(errors.homeAirport)}
             aria-describedby={describedBy("homeAirport")}
-            onChange={(e) => set("homeAirport", e.target.value)}
+            onChange={(e) => set("homeAirport", e.target.value, { immediate: true })}
           >
             <option value="">Pick one</option>
             {airports.map((airport) => (
@@ -173,7 +188,7 @@ export function IntakeForm() {
             value={draft.skiLevel}
             aria-invalid={Boolean(errors.skiLevel)}
             aria-describedby={describedBy("skiLevel")}
-            onChange={(e) => set("skiLevel", e.target.value)}
+            onChange={(e) => set("skiLevel", e.target.value, { immediate: true })}
           >
             <option value="">Pick one</option>
             {SKI_LEVELS.map((level) => (
