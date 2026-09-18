@@ -21,6 +21,10 @@ type ResponseContextValue = {
   /** True when the server-side load threw (e.g. the database is unreachable),
    * as opposed to a genuine first-time visitor with no saved response. */
   loadFailed: boolean;
+  /** True once a write 404s — the row is gone (stale cookie, merged/deleted
+   * server-side). Distinct from loadFailed: here starting fresh is exactly
+   * the right next step, not a risky one. */
+  sessionLost: boolean;
   status: SaveStatus;
   lastSavedAt: number | null;
   problems: FinishProblem[];
@@ -65,10 +69,16 @@ async function postJson(url: string, body: unknown, method = "POST") {
     } catch {
       // Non-JSON error body (a raw 500, say) — the generic message stands.
     }
-    throw new Error(message);
+    // Status travels with the error so callers can single out a 404 (the row
+    // is gone) from every other failure, which calls for retrying, not reset.
+    throw Object.assign(new Error(message), { status: res.status });
   }
 
   return res.json();
+}
+
+function isNotFound(err: unknown): boolean {
+  return err instanceof Error && (err as { status?: number }).status === 404;
 }
 
 export function ResponseProvider({
@@ -82,6 +92,16 @@ export function ResponseProvider({
 }) {
   const [response, setResponse] = useState<ClientResponse | null>(initialResponse);
   const [problems, setProblems] = useState<FinishProblem[]>([]);
+  const [sessionLost, setSessionLost] = useState(false);
+
+  // The row is confirmed gone (stale cookie, merged/deleted server-side) —
+  // starting fresh is the right next step here, not a risky one, so this
+  // clears state instead of leaving the autosave hooks to retry forever.
+  const handleSessionLost = useCallback(() => {
+    setResponse(null);
+    setProblems([]);
+    setSessionLost(true);
+  }, []);
 
   /**
    * Autosave responses are deliberately *not* written back into state. The
@@ -94,13 +114,29 @@ export function ResponseProvider({
    * finish", which is where its reply is applied.
    */
   const fields = useAutosave<RespondentPatch>(async (patch) => {
-    await postJson("/api/respondents", patch, "PATCH");
+    try {
+      await postJson("/api/respondents", patch, "PATCH");
+    } catch (err) {
+      if (isNotFound(err)) {
+        handleSessionLost();
+        return;
+      }
+      throw err;
+    }
   });
 
   const availability = useAutosave<{ entries: AvailabilityEntry[] }>(async (patch) => {
-    // Merge semantics land exactly right here: `entries` is the whole set, so
-    // the newest write wins, which is what replace-all wants.
-    await postJson("/api/availability", patch);
+    try {
+      // Merge semantics land exactly right here: `entries` is the whole set, so
+      // the newest write wins, which is what replace-all wants.
+      await postJson("/api/availability", patch);
+    } catch (err) {
+      if (isNotFound(err)) {
+        handleSessionLost();
+        return;
+      }
+      throw err;
+    }
   });
 
   const startResponse = useCallback(async (intake: IntakeInput) => {
@@ -164,6 +200,10 @@ export function ResponseProvider({
         setProblems(body.problems ?? []);
         return { ok: false };
       }
+      if (res.status === 404) {
+        handleSessionLost();
+        return { ok: false };
+      }
       if (!res.ok) {
         // The API's own error bodies are already written for a guest to
         // read (rate limit, no-such-respondent, DB unreachable) — prefer
@@ -191,7 +231,7 @@ export function ResponseProvider({
         message: "Couldn't reach the server — check your connection and try again.",
       };
     }
-  }, [fields, availability]);
+  }, [fields, availability, handleSessionLost]);
 
   const retry = useCallback(() => {
     void fields.flush();
@@ -212,6 +252,7 @@ export function ResponseProvider({
     () => ({
       response,
       loadFailed,
+      sessionLost,
       status,
       lastSavedAt: Math.max(fields.lastSavedAt ?? 0, availability.lastSavedAt ?? 0) || null,
       problems,
@@ -224,6 +265,7 @@ export function ResponseProvider({
     [
       response,
       loadFailed,
+      sessionLost,
       status,
       fields.lastSavedAt,
       availability.lastSavedAt,

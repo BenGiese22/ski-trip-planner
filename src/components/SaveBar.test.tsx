@@ -30,6 +30,7 @@ function mockUseResponse(overrides: Partial<ReturnType<typeof useResponse>> = {}
   vi.mocked(useResponse).mockReturnValue({
     response: baseResponse(),
     loadFailed: false,
+    sessionLost: false,
     status: "idle",
     lastSavedAt: null,
     problems: [],

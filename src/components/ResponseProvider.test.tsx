@@ -63,6 +63,38 @@ describe("ResponseProvider startResponse()", () => {
   });
 });
 
+describe("ResponseProvider, the row is gone (404)", () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  // Before this fix, a 404 (stale cookie, row merged/deleted server-side)
+  // retried like any other failure and eventually surfaced a generic "error"
+  // — misleading, since no amount of retrying was ever going to work.
+  it("resets to a fresh state instead of retrying forever", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: () =>
+        Promise.resolve({ error: "No response found for this browser. Start with the intake form." }),
+    }) as unknown as typeof fetch;
+
+    const { result } = renderHook(() => useResponse(), { wrapper });
+
+    await act(async () => {
+      result.current.update({ notes: "x" }, { immediate: true });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(result.current.response).toBeNull();
+    expect(result.current.sessionLost).toBe(true);
+    expect(result.current.status).not.toBe("error");
+  });
+});
+
 describe("ResponseProvider finish()", () => {
   const originalFetch = global.fetch;
 

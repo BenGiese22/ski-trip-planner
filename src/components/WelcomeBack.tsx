@@ -8,7 +8,7 @@ import { useResponse } from "./ResponseProvider";
  * the "we know who you are" header above the editable form.
  */
 export function WelcomeBack() {
-  const { response, loadFailed } = useResponse();
+  const { response, loadFailed, sessionLost } = useResponse();
 
   if (loadFailed) {
     return (
@@ -17,6 +17,18 @@ export function WelcomeBack() {
           Couldn&rsquo;t load your saved answers just now — everything below
           is still readable. Reload in a minute to pick up where you left
           off.
+        </p>
+      </div>
+    );
+  }
+
+  if (sessionLost) {
+    return (
+      <div className="bg-[#FBEDCB] border border-gold rounded-xl p-5 mb-3.5">
+        <p className="text-sm text-ink">
+          We couldn&rsquo;t find your saved answers — they may have expired
+          or been submitted already. Start fresh below; it only takes a
+          minute.
         </p>
       </div>
     );
