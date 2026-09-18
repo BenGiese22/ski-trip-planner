@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AvailabilityStatus } from "@/db/schema";
 import { buildMonthGrids, datesInRange, quickPicks } from "@/lib/dates";
+import { endGesture, moveGesture, startGesture, type GestureState } from "@/lib/paintGesture";
 import { useResponse } from "./ResponseProvider";
 
 const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"];
@@ -57,8 +58,7 @@ export function AvailabilityGrid() {
     [setAvailability],
   );
 
-  const anchor = useRef<string | null>(null);
-  const dragged = useRef(false);
+  const gesture = useRef<GestureState>({ anchor: null, dragged: false });
   const [painting, setPainting] = useState(false);
 
   const paintRange = useCallback(
@@ -84,36 +84,61 @@ export function AvailabilityGrid() {
     [statuses, commit],
   );
 
-  // A press that never leaves its cell is a click and cycles that day; one
-  // that moves paints a range. Resolving it on pointer-up keeps a single tap
-  // from being read as a one-day drag.
+  // Refs so the pointer listeners below always call the latest paintRange/
+  // cycle without needing to resubscribe mid-drag every time `statuses`
+  // (and so `paintRange`/`cycle`) gets a new identity.
+  const paintRangeRef = useRef(paintRange);
+  const cycleRef = useRef(cycle);
   useEffect(() => {
-    if (!painting) return;
-    const end = () => {
-      if (!dragged.current && anchor.current) cycle(anchor.current);
-      anchor.current = null;
-      dragged.current = false;
-      setPainting(false);
-    };
-    window.addEventListener("pointerup", end);
-    window.addEventListener("pointercancel", end);
-    return () => {
-      window.removeEventListener("pointerup", end);
-      window.removeEventListener("pointercancel", end);
-    };
-  }, [painting, cycle]);
+    paintRangeRef.current = paintRange;
+    cycleRef.current = cycle;
+  }, [paintRange, cycle]);
 
   function onPointerDown(date: string) {
-    anchor.current = date;
-    dragged.current = false;
+    gesture.current = startGesture(date);
     setPainting(true);
   }
 
-  function onPointerEnter(date: string) {
-    if (!painting || !anchor.current || anchor.current === date) return;
-    dragged.current = true;
-    paintRange(anchor.current, date);
-  }
+  // Touch gives the cell under pointerdown implicit capture, so pointermove
+  // (and the per-cell pointerenter it would otherwise drive) keeps targeting
+  // that first cell no matter where the finger goes — a drag that starts on
+  // day one only ever paints day one. Tracking one pointer over the whole
+  // grid and reading the cell under it via elementFromPoint sidesteps that
+  // capture entirely, and works identically for mouse.
+  useEffect(() => {
+    if (!painting) return;
+
+    function dateAt(x: number, y: number): string | null {
+      const el = document.elementFromPoint(x, y);
+      return el instanceof Element
+        ? (el.closest<HTMLElement>("[data-date]")?.dataset.date ?? null)
+        : null;
+    }
+
+    function onMove(e: PointerEvent) {
+      const date = dateAt(e.clientX, e.clientY);
+      if (!date) return;
+      const { state, action } = moveGesture(gesture.current, date);
+      gesture.current = state;
+      if (action?.type === "paint") paintRangeRef.current(action.from, action.to);
+    }
+
+    function onUp() {
+      const { action } = endGesture(gesture.current);
+      if (action?.type === "cycle") cycleRef.current(action.date);
+      gesture.current = { anchor: null, dragged: false };
+      setPainting(false);
+    }
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+  }, [painting]);
 
   function applyQuickPick(dates: string[]) {
     const next = new Map(statuses);
@@ -183,8 +208,8 @@ export function AvailabilityGrid() {
                   <button
                     key={cell.date}
                     type="button"
+                    data-date={cell.date}
                     onPointerDown={() => onPointerDown(cell.date)}
-                    onPointerEnter={() => onPointerEnter(cell.date)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
