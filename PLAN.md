@@ -56,7 +56,7 @@ Widen `foodAndDrink` and `otherActivities` beyond one-line summaries — feedbac
 ## 3. Core user flows
 
 **Guest, first visit**
-Landing → short intake (name, plus-one or solo, **home airport**, ski ability) → destination cards → availability calendar → **flights, personalized to the home airport just given** → cost estimate → optional notes → submit. On submit, set a persistent identity cookie (see section 6) so they're recognized on return.
+Landing → short intake (name, plus-one or solo, **home airport**, ski ability) → destination cards → availability calendar → **flights, personalized to the home airport just given** → cost estimate → optional notes → submit. On submit, set a persistent identity cookie (see section 6) so they're recognized on return. **[Correction, Phase 4]:** the optional notes step was dropped from scope — see section 18, decision 2. The `notes` column stays in the schema (section 5) for a possible later phase, but no UI reads or writes it today.
 
 Home airport is captured in the intake step specifically so the "getting there" content later in the flow can skip the airport-picker UI entirely and just show the one relevant card — no one needs to read about the other two cities' flight options. This also means "getting there" depends on intake having already run, so it can't be the first thing on the page; it belongs after destinations and dates, once the respondent's context is known.
 
@@ -158,7 +158,7 @@ The original 3-radio-button version doesn't work for someone like a teacher whos
 
 ## 8. Cost calculator
 
-**Important correction from earlier passes:** the first version priced everyone into a full Ikon Base Pass (~$1,019, unlimited for the season). That's what Ben and Megan already hold, but almost nobody else in this group skis enough to justify buying one new — most people are skiing 1–3 days on this one trip. The right product for them is the **Ikon Session Pass** (1, 2, or 3 days — cap the input at 3, this group isn't buying a 4-day — usable across Copper, Winter Park, Steamboat, Eldora, and A-Basin, the exact set this group cares about). The 2-day tier's published starting price is $319; 1- and 3-day are priced at checkout on ikonpass.com and should be treated as estimates until confirmed there.
+**Important correction from earlier passes:** the first version priced everyone into a full Ikon Base Pass (~$1,019, unlimited for the season). That's what Ben and Megan already hold, but almost nobody else in this group skis enough to justify buying one new — most people are skiing 1–3 days on this one trip. The right product for them is the **Ikon Session Pass** (1, 2, or 3 days — cap the input at 3, this group isn't buying a 4-day — usable across Copper, Winter Park, Steamboat, Eldora, and A-Basin, the exact set this group cares about). The 2-day tier's published starting price is $319; 1- and 3-day are priced at checkout on ikonpass.com and should be treated as estimates until confirmed there. **[Correction, Phase 1 research / recorded Phase 4]:** the Session Pass turned out to only come in 2- and 3-day tiers — there is no 1-day Session Pass at all. A guest skiing 1 day buys a standalone resort lift ticket instead (see `oneDayLiftTicketByDestination` in `costAssumptions.ts` and `src/lib/costs.ts`); pricing for 2-day ($319/$249 student) and 3-day ($429/$359 student) is confirmed, not an estimate. The code has always been correct on this; this doc just hadn't been updated to say so until now.
 
 Ask for ski days **per person, not per response** — one guest's days and their plus-one's days are frequently different (one person skiing three days while their partner skis one is a completely normal split), so a single shared input would silently misprice half the group. The `ski_days` / `plus_one_ski_days` columns in section 5 exist for exactly this; the guest-facing form should render two small selectors side by side when a plus-one is present ("You" / "Your plus-one"), each with its own 1/2/3/"already have a pass" options, rather than one shared control. Default both selectors to 2 days pre-selected — it's the most common answer for a short trip and saves most people a click; someone skiing 1 or 3 just changes it. Keep the plus-one's copy in third person throughout ("They already have a pass," not "I already have a pass") — it's a small thing, but a first-person label under someone else's name reads as a copy bug the moment anyone actually looks at it.
 
@@ -431,3 +431,78 @@ settled.
 
 These decisions supersede the corresponding details in sections 3, 6, 7, 8 and
 14 above where they conflict; the rest of those sections still apply as written.
+
+---
+
+## 18. Phase 4 implementation decisions (confirmed before implementation started)
+
+Phase 3 is complete, merged to `main`, and live. Phase 4 (the polish pass) is
+different in kind from Phases 2 and 3 — it's a review-and-fix pass over an app
+that already exists end to end, not new isolated modules — so its planning
+pass read through the actual current implementation rather than starting from
+a blank slate, and surfaced real bugs alongside the polish PLAN.md section 11
+asked for. As with sections 16 and 17, treat the following as settled.
+
+1. **Mobile test coverage was never actually dropped.** `playwright.config.ts`
+   still runs every spec on both `chromium` and `mobile-chromium`
+   (`devices["Pixel 7"]`) — a prior read of the file during Phase 4 planning
+   was wrong about this. The real, narrower gap: zero touch-gesture coverage
+   (every mobile-project test still drives the page with synthesized mouse
+   clicks) and only one mobile width tested (412px). No new Playwright
+   project is added for this phase — touch tests land in a new
+   `e2e/mobile.spec.ts` guarded to touch-capable projects, and narrow-width
+   coverage is a `page.setViewportSize()` call inside the existing overflow
+   test, not a third project (the suite runs serially for DB isolation, so a
+   third project is a real CI-time cost for a check that doesn't need one).
+
+2. **Touch-painting on the availability grid gets fixed properly, not
+   downgraded to tap-only.** The grid has two real bugs on touch, not just
+   missing polish: a scroll that starts on a day toggles it (the same
+   handler is bound to `pointercancel` and `pointerup`), and drag-painting
+   cannot work at all on touch (`pointerenter` never fires under a touch
+   pointer's implicit capture, and `touchAction` is set via React state after
+   the gesture has already started, too late for the browser to respect it).
+   Fix: split `pointercancel` from `pointerup` so a cancelled gesture never
+   cycles a day; add a static `touch-pan-y` class so vertical scrolling keeps
+   working; drive painting from `pointermove` on the grid container via
+   `document.elementFromPoint()` + a `data-date` attribute, which works
+   under implicit capture and unifies the mouse and touch code paths. The
+   gesture arithmetic (down/move/up/cancel → cycle a day, paint a range, or
+   do nothing) lives in a new pure module, `src/lib/paintGesture.ts`, TDD'd
+   per house rule rather than tested only through the DOM.
+
+3. **The `notes` field is dropped from scope, not built.** PLAN.md section 3
+   lists an optional notes step in the guest flow, and the `respondents.notes`
+   column exists in the schema (section 5) and the Zod patch schema — but no
+   component has ever read or written it, and it was never in `mockup.html`
+   either. Rather than build a whole feature under a "polish pass," it's
+   formally out of scope: the column stays (a later phase can pick it up
+   without a migration), but section 3's flow description is corrected
+   in-line to say so.
+
+4. **The 1-day Ikon Session Pass tier in section 8 was already stale —
+   corrected in-line there.** The Session Pass only ever came in 2- and
+   3-day tiers; a guest skiing 1 day gets a standalone resort lift ticket
+   instead. The *code* has been right about this since Phase 1 research;
+   PLAN.md's section 8 just never caught up to say so until now.
+
+5. **Everything else in the plan's recommendations is accepted as proposed**,
+   without a separate line-item debate, since none of it changes behavior in
+   a way worth re-litigating on its own:
+   - Loading states: none added for `/` (a skeleton would flicker for a
+     lookup this fast); a `Suspense` fallback is added for `/admin`'s
+     dashboard load, matching its section headings so nothing jumps.
+   - Autosave errors get an honest fix (the retry budget actually resets on
+     the next edit) plus a manual "Retry" button in `SaveBar`, rather than a
+     silent background retry loop.
+   - The section-number gutter (the "01–05" circle) goes static above the
+     heading on narrow viewports instead of eating ~50px of width from every
+     absolutely-positioned occurrence.
+   - The admin dashboard's empty state collapses from four separate "nothing
+     yet" statements to one.
+   - The hero paragraph gets trimmed, and the birthday aside is kept only in
+     the "When to go" section instead of repeated verbatim in both places.
+
+These decisions supersede the corresponding details in sections 3, 7, 8, 11
+and 14 above where they conflict; the rest of those sections still apply as
+written.
