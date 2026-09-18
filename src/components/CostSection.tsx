@@ -7,6 +7,7 @@ import { formatUsd, formatUsdRange } from "@/lib/format";
 import { respondentCostBreakdown, PASS_HOLDER_ASSUMED_SKI_DAYS } from "@/lib/respondentCosts";
 import type { TripCostEstimate } from "@/lib/costs";
 import type { DestinationSlug } from "@/data/types";
+import { EmptyState } from "./EmptyState";
 import { SkiDaysControls } from "./SkiDaysControls";
 import { SourceLine } from "./SourceLine";
 import { useResponse } from "./ResponseProvider";
@@ -84,10 +85,10 @@ function PersonalisedCosts() {
       </p>
 
       {!destination ? (
-        <p className="text-sm text-ink-soft border border-line rounded-lg p-4">
+        <EmptyState>
           Rank the destinations up in &ldquo;Where to go&rdquo; and this
           becomes your own estimate rather than an example.
-        </p>
+        </EmptyState>
       ) : (
         <Breakdown destinationName={destination.name} destinationSlug={destination.slug} />
       )}

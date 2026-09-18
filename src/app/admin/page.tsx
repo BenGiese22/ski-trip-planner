@@ -4,6 +4,7 @@ import { AdminDestinationTally } from "@/components/AdminDestinationTally";
 import { AdminHeatmap } from "@/components/AdminHeatmap";
 import { AdminLoginForm } from "@/components/AdminLoginForm";
 import { AdminLogoutButton } from "@/components/AdminLogoutButton";
+import { EmptyState } from "@/components/EmptyState";
 import {
   availabilityCountsByDate,
   countSubmittedRespondents,
@@ -35,7 +36,7 @@ export default async function AdminPage() {
   const authenticated = await isAdminAuthenticated();
 
   return (
-    <main className="max-w-[980px] mx-auto px-6 py-14">
+    <main className="max-w-[980px] mx-auto px-4 sm:px-6 py-14">
       <div className="flex items-baseline justify-between gap-4 flex-wrap mb-1.5">
         <h1 className="text-2xl">Responses</h1>
         {authenticated && <AdminLogoutButton />}
@@ -97,10 +98,10 @@ async function AdminDashboard() {
           The darker the day, the more of the group it works for.
         </p>
         {totalRespondents === 0 ? (
-          <p className="text-sm text-ink-soft border border-line rounded-lg p-4">
+          <EmptyState>
             Nothing to show yet — the heatmap fills in as people finish their
             responses.
-          </p>
+          </EmptyState>
         ) : (
           <AdminHeatmap
             grids={buildHeatmap(counts, totalRespondents)}
@@ -115,9 +116,7 @@ async function AdminDashboard() {
           Ranked best-first by each person. Every option is listed, including any nobody put first.
         </p>
         {totalRespondents === 0 ? (
-          <p className="text-sm text-ink-soft border border-line rounded-lg p-4">
-            No preferences yet.
-          </p>
+          <EmptyState>No preferences yet.</EmptyState>
         ) : (
           <AdminDestinationTally rows={tallyDestinations(rankings, totalRespondents)} />
         )}
@@ -129,10 +128,10 @@ async function AdminDashboard() {
           Per person, and for the group. Planning estimates, not quotes.
         </p>
         {totalRespondents === 0 ? (
-          <p className="text-sm text-ink-soft border border-line rounded-lg p-4">
+          <EmptyState>
             No costs to add up yet — this fills in as people finish their
             responses.
-          </p>
+          </EmptyState>
         ) : (
           <AdminCostRollup rollup={buildCostRollup(costEntries)} />
         )}

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AvailabilityStatus } from "@/db/schema";
 import { buildMonthGrids, datesInRange, quickPicks } from "@/lib/dates";
 import { endGesture, moveGesture, startGesture, type GestureState } from "@/lib/paintGesture";
+import { EmptyState } from "./EmptyState";
 import { useResponse } from "./ResponseProvider";
 
 const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"];
@@ -148,10 +149,10 @@ export function AvailabilityGrid() {
 
   if (!started) {
     return (
-      <p className="text-sm text-ink-soft border border-line rounded-lg p-4">
+      <EmptyState>
         Answer the questions up top and the calendar opens up here, so you can
         mark the days that could work for you.
-      </p>
+      </EmptyState>
     );
   }
 
