@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { createRespondent, updateRespondent } from "@/db/queries";
+import {
+  createRespondent,
+  replaceDeclineWithRespondent,
+  updateRespondent,
+} from "@/db/queries";
 import { badRequest, noSuchRespondent, guestWriteLimit, readJson } from "@/lib/api";
 import { intakeSchema, respondentPatchSchema } from "@/lib/schemas";
 import {
@@ -8,7 +12,7 @@ import {
   identityCookieOptions,
   isSecureRequest,
 } from "@/lib/session";
-import { currentRespondent, loadClientResponse } from "@/lib/serverSession";
+import { currentDecline, currentRespondent, loadClientResponse } from "@/lib/serverSession";
 
 /**
  * Creates the respondent row. Nothing is written before this point — intake
@@ -31,8 +35,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ response: await loadClientResponse(updated) });
   }
 
+  const decline = await currentDecline();
   const token = createCookieToken();
-  const created = await createRespondent(parsed.data, token);
+  const created = decline
+    ? await replaceDeclineWithRespondent(parsed.data, decline.cookieToken, token)
+    : await createRespondent(parsed.data, token);
 
   const response = NextResponse.json(
     { response: await loadClientResponse(created) },
