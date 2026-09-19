@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { AdminCostRollup } from "@/components/AdminCostRollup";
 import { AdminDestinationTally } from "@/components/AdminDestinationTally";
 import { AdminHeatmap } from "@/components/AdminHeatmap";
 import { AdminLoginForm } from "@/components/AdminLoginForm";
 import { AdminLogoutButton } from "@/components/AdminLogoutButton";
+import { EmptyState } from "@/components/EmptyState";
 import {
   availabilityCountsByDate,
   countSubmittedRespondents,
@@ -42,7 +44,9 @@ export default async function AdminPage() {
       </div>
 
       {authenticated ? (
-        <AdminDashboard />
+        <Suspense fallback={<DashboardSkeleton />}>
+          <AdminDashboard />
+        </Suspense>
       ) : (
         <>
           <p className="text-sm text-ink-soft max-w-[60ch] mb-5">
@@ -53,6 +57,55 @@ export default async function AdminPage() {
         </>
       )}
     </main>
+  );
+}
+
+// Mirrors AdminDashboard's headings and subtitles exactly — the DB queries
+// resolve into this same layout, so nothing shifts when the real content
+// streams in over this fallback.
+function DashboardSkeleton() {
+  return (
+    <div aria-busy="true">
+      <div
+        className="h-4 w-56 bg-paper border border-line rounded mb-6 animate-pulse"
+        aria-hidden="true"
+      />
+
+      <section className="mb-10">
+        <h2 className="text-xl mb-1.5">When the group can go</h2>
+        <p className="text-sm text-ink-soft max-w-[60ch] mb-4">
+          The darker the day, the more of the group it works for.
+        </p>
+        <div
+          className="h-32 bg-paper border border-line rounded-lg animate-pulse"
+          aria-hidden="true"
+        />
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-xl mb-1.5">Where they&rsquo;d rather go</h2>
+        <p className="text-sm text-ink-soft max-w-[60ch] mb-4">
+          Ranked best-first by each person. Every option is listed, including any nobody put first.
+        </p>
+        <div
+          className="h-32 bg-paper border border-line rounded-lg animate-pulse"
+          aria-hidden="true"
+        />
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-xl mb-1.5">What it adds up to</h2>
+        <p className="text-sm text-ink-soft max-w-[60ch] mb-4">
+          Per person, and for the group. Planning estimates, not quotes.
+        </p>
+        <div
+          className="h-32 bg-paper border border-line rounded-lg animate-pulse"
+          aria-hidden="true"
+        />
+      </section>
+
+      <p className="sr-only">Loading responses…</p>
+    </div>
   );
 }
 
@@ -83,6 +136,21 @@ async function AdminDashboard() {
 
   const { totalRespondents, counts, rankings, costEntries } = data;
 
+  // One shared message stands in for what used to be a separate "nothing
+  // yet" statement under each of the three sections below — the first
+  // response fills in all three at once, so there was never a reason for a
+  // guest to read the same idea three different ways.
+  if (totalRespondents === 0) {
+    return (
+      <div data-testid="admin-dashboard">
+        <EmptyState>
+          Nobody&rsquo;s finished a response yet — this page fills in once
+          people do.
+        </EmptyState>
+      </div>
+    );
+  }
+
   return (
     <div data-testid="admin-dashboard">
       <p className="text-sm text-ink-soft mb-6">
@@ -96,17 +164,10 @@ async function AdminDashboard() {
         <p className="text-sm text-ink-soft max-w-[60ch] mb-4">
           The darker the day, the more of the group it works for.
         </p>
-        {totalRespondents === 0 ? (
-          <p className="text-sm text-ink-soft border border-line rounded-lg p-4">
-            Nothing to show yet — the heatmap fills in as people finish their
-            responses.
-          </p>
-        ) : (
-          <AdminHeatmap
-            grids={buildHeatmap(counts, totalRespondents)}
-            totalRespondents={totalRespondents}
-          />
-        )}
+        <AdminHeatmap
+          grids={buildHeatmap(counts, totalRespondents)}
+          totalRespondents={totalRespondents}
+        />
       </section>
 
       <section className="mb-10">
@@ -114,13 +175,7 @@ async function AdminDashboard() {
         <p className="text-sm text-ink-soft max-w-[60ch] mb-4">
           Ranked best-first by each person. Every option is listed, including any nobody put first.
         </p>
-        {totalRespondents === 0 ? (
-          <p className="text-sm text-ink-soft border border-line rounded-lg p-4">
-            No preferences yet.
-          </p>
-        ) : (
-          <AdminDestinationTally rows={tallyDestinations(rankings, totalRespondents)} />
-        )}
+        <AdminDestinationTally rows={tallyDestinations(rankings, totalRespondents)} />
       </section>
 
       <section className="mb-10">
@@ -128,14 +183,7 @@ async function AdminDashboard() {
         <p className="text-sm text-ink-soft max-w-[60ch] mb-4">
           Per person, and for the group. Planning estimates, not quotes.
         </p>
-        {totalRespondents === 0 ? (
-          <p className="text-sm text-ink-soft border border-line rounded-lg p-4">
-            No costs to add up yet — this fills in as people finish their
-            responses.
-          </p>
-        ) : (
-          <AdminCostRollup rollup={buildCostRollup(costEntries)} />
-        )}
+        <AdminCostRollup rollup={buildCostRollup(costEntries)} />
       </section>
     </div>
   );

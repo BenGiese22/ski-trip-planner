@@ -127,8 +127,7 @@ test("with no responses the dashboard says so instead of showing an empty grid",
 }) => {
   await signIn(page);
 
-  await expect(page.getByText(/0\s/).first()).toBeVisible();
-  await expect(page.getByText(/the heatmap fills in as people finish/i)).toBeVisible();
+  await expect(page.getByText(/nobody.s finished a response yet/i)).toBeVisible();
 });
 
 // Section 17 decision 3: only finished responses move the numbers.
@@ -142,7 +141,7 @@ test("an unfinished response is not counted", async ({ page, browser }) => {
   await guest.close();
 
   await signIn(page);
-  await expect(page.getByText(/the heatmap fills in as people finish/i)).toBeVisible();
+  await expect(page.getByText(/nobody.s finished a response yet/i)).toBeVisible();
 });
 
 test("a finished response shows up in the heatmap", async ({ page, browser }) => {
