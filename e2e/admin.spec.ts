@@ -1,6 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { TEST_ADMIN_PASSCODE, databaseUrl, truncateAll } from "./database";
-import { completeIntake, pickDestination } from "./helpers";
+import {
+  completeIntake,
+  declineAfterStarting,
+  declineAsFirstTimer,
+  pickDestination,
+} from "./helpers";
 
 test.beforeEach(async () => {
   await truncateAll(databaseUrl);
@@ -130,6 +135,28 @@ test("with no responses the dashboard says so instead of showing an empty grid",
   await expect(page.getByText(/nobody.s finished a response yet/i)).toBeVisible();
 });
 
+// A decline before anyone finishes intake still has to surface somewhere —
+// otherwise Ben sees "nobody's responded" and has no idea one person already
+// answered, just in the negative.
+test("a decline before anyone finishes shows up in the empty state", async ({
+  page,
+  browser,
+}) => {
+  const guest = await browser.newContext();
+  const guestPage = await guest.newPage();
+  await guestPage.goto("/");
+  await declineAsFirstTimer(guestPage, { name: "Sam Lee" });
+  await guest.close();
+
+  await signIn(page);
+
+  await expect(page.getByText(/nobody.s finished a response yet/i)).toBeVisible();
+  await expect(page.getByText(/1 person has said they can.t make it/i)).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: /when the group can go/i }),
+  ).toBeHidden();
+});
+
 // Section 17 decision 3: only finished responses move the numbers.
 test("an unfinished response is not counted", async ({ page, browser }) => {
   const guest = await browser.newContext();
@@ -208,6 +235,10 @@ test("the cost rollup prices each person and totals the group", async ({
     { name: "Cara", airport: "ORD", dest: "summitCounty", plusOne: true },
   ];
 
+  // Cara's context stays open past the loop — a later scenario has her
+  // decline through it (entry point B needs her existing cookie/session).
+  let caraPage: import("@playwright/test").Page | undefined;
+
   for (const g of guests) {
     const ctx = await browser.newContext();
     const p = await ctx.newPage();
@@ -233,7 +264,8 @@ test("the cost rollup prices each person and totals the group", async ({
     }
     await p.getByRole("button", { name: /save & finish/i }).click();
     await expect(p.getByRole("button", { name: /update my answer/i })).toBeVisible();
-    await ctx.close();
+    if (g.name === "Cara") caraPage = p;
+    else await ctx.close();
   }
 
   await signIn(page);
@@ -246,6 +278,43 @@ test("the cost rollup prices each person and totals the group", async ({
   // Three people across two rows — the plus-one has to count.
   await expect(page.getByText(/3 people/)).toBeVisible();
   await expect(page.getByText(/Everyone, together/)).toBeVisible();
+  // Both guests' quick-picked days land on the same date — both count.
+  await expect(page.getByLabel(/Thursday, January 28 — 2 available/)).toBeVisible();
+
+  // Cara declines afterward (entry point B) — her respondent row stays in
+  // the database, but every admin aggregate should drop her outright.
+  await declineAfterStarting(caraPage!, { reason: "can't make it after all" });
+
+  await page.reload();
+  await expect(page.getByText(/1 person has finished.*1 can.t make it/)).toBeVisible();
+  await expect(page.getByText("Ana", { exact: true })).toBeVisible();
+  await expect(page.getByText("Cara", { exact: true })).toBeHidden();
+  await expect(page.getByLabel(/Thursday, January 28 — 1 available/)).toBeVisible();
+  // The tally reverts to Ana's own choice; Summit County drops back to zero.
+  await expect(page.getByText(/1 first choice · 100%/)).toBeVisible();
+  await expect(page.getByText(/0 first choices/)).toHaveCount(2);
+  // The rollup is Ana alone now — no plus-one, so it's "1 person", not "3".
+  await expect(page.getByText(/\(1 person\)/)).toBeVisible();
+
+  // Undo the decline through the UI, exactly as a guest changing their mind
+  // would — the same context, cookie, and page that submitted it. "Update my
+  // answer" is a bad signal to wait on here: the save bar renders it
+  // regardless of decline state, so it's already visible before the click.
+  // The decline banner disappearing is what actually tracks the undo.
+  await caraPage!.getByRole("button", { name: /actually, i can make it/i }).click();
+  await expect(
+    caraPage!.getByRole("heading", { name: /thanks for letting ben know/i }),
+  ).toBeHidden();
+  await caraPage!.context().close();
+
+  await page.reload();
+  await expect(page.getByText(/2 people have finished/i)).toBeVisible();
+  await expect(page.getByText(/can.t make it/i)).toBeHidden();
+  await expect(page.getByText("Ana", { exact: true })).toBeVisible();
+  // Cara has a plus-one, so her row's text is "Cara +1" — not an exact match.
+  await expect(page.getByText("Cara", { exact: false })).toBeVisible();
+  await expect(page.getByText(/3 people/)).toBeVisible();
+  await expect(page.getByLabel(/Thursday, January 28 — 2 available/)).toBeVisible();
 });
 
 // Section 17 decision 6: the assumption must be visible in Ben's view too, or
