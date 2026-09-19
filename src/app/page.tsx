@@ -39,7 +39,7 @@ export default async function Home() {
           id="you"
           number="01"
           title="You"
-          subtitle="Five quick questions, and the rest of the page tailors itself to your answers. Nothing here is a commitment, and everything saves itself as you go."
+          subtitle="Five quick questions, and the rest of the page tailors itself to your answers. Nothing here is a commitment."
         >
           <WelcomeBack />
           <IntakeForm />

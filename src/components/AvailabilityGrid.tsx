@@ -221,7 +221,7 @@ export function AvailabilityGrid() {
       <p className="text-xs text-ink-soft mt-2">
         Tell us when you could go regardless of where — the blackout flag is
         just so you know those days don&rsquo;t work at two of the three
-        options. Copper Mountain has no blackout dates on any Ikon tier.
+        options.
       </p>
     </div>
   );
