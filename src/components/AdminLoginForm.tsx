@@ -55,7 +55,7 @@ export function AdminLoginForm() {
         onChange={(e) => setPasscode(e.target.value)}
         aria-invalid={Boolean(error)}
         aria-describedby={error ? `${id}-error` : undefined}
-        className="w-full border border-line rounded-md px-3 py-2.5 text-sm bg-paper text-ink focus:outline-2 focus:outline-offset-2 focus:outline-pine"
+        className="w-full border border-line rounded-md px-3 py-2.5 text-base sm:text-sm bg-paper text-ink focus:outline-2 focus:outline-offset-2 focus:outline-pine"
       />
 
       {/* Live region so the error is announced without moving focus. */}
