@@ -26,7 +26,7 @@ type ResponseContextValue = {
   /** Debounced autosave. Pass immediate for selects, toggles and blur. */
   update: (patch: RespondentPatch, options?: { immediate?: boolean }) => void;
   setAvailability: (entries: AvailabilityEntry[]) => void;
-  finish: () => Promise<{ ok: boolean }>;
+  finish: () => Promise<{ ok: boolean; message?: string }>;
 };
 
 const ResponseContext = createContext<ResponseContextValue | null>(null);
@@ -126,20 +126,30 @@ export function ResponseProvider({
     // completeness, so every pending write has to have landed first. Firing
     // and hoping loses the race on a slow connection, and the person gets
     // told to fill in answers they already gave.
-    await Promise.all([fields.flush(), availability.flush()]);
+    try {
+      await Promise.all([fields.flush(), availability.flush()]);
 
-    const res = await fetch("/api/respondents/finish", { method: "POST" });
-    if (res.status === 422) {
+      const res = await fetch("/api/respondents/finish", { method: "POST" });
+      if (res.status === 422) {
+        const body = await res.json();
+        setProblems(body.problems ?? []);
+        return { ok: false };
+      }
+      if (!res.ok) {
+        const message = await res
+          .json()
+          .then((body) => body?.error)
+          .catch(() => undefined);
+        return { ok: false, message: message ?? "Couldn't save & finish — try again." };
+      }
+
       const body = await res.json();
-      setProblems(body.problems ?? []);
-      return { ok: false };
+      setResponse(body.response);
+      setProblems([]);
+      return { ok: true };
+    } catch {
+      return { ok: false, message: "Couldn't save & finish — try again." };
     }
-    if (!res.ok) return { ok: false };
-
-    const body = await res.json();
-    setResponse(body.response);
-    setProblems([]);
-    return { ok: true };
   }, [fields, availability]);
 
   // One indicator for two savers: an error anywhere is an error, and a save
