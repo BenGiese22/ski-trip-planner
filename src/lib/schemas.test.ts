@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   availabilityBulkSchema,
+  declineReasonSchema,
+  declineSchema,
   intakeSchema,
   respondentPatchSchema,
 } from "./schemas";
@@ -221,4 +223,74 @@ describe("availabilityBulkSchema", () => {
     }));
     expect(availabilityBulkSchema.safeParse({ entries }).success).toBe(false);
   });
+});
+
+describe("declineSchema", () => {
+  it("accepts name-only, since email and reason are optional", () => {
+    expect(declineSchema.safeParse({ name: "Jamie Rivera" }).success).toBe(true);
+  });
+
+  it("rejects a missing name", () => {
+    expect(declineSchema.safeParse({}).success).toBe(false);
+  });
+
+  it("rejects a name that is blank or only whitespace", () => {
+    expect(declineSchema.safeParse({ name: "" }).success).toBe(false);
+    expect(declineSchema.safeParse({ name: "   " }).success).toBe(false);
+  });
+
+  // Contrast intakeSchema's email field: this one is free text, not
+  // format-validated, so a plausible-looking typo is accepted rather than
+  // rejected.
+  it("accepts a malformed-looking email, since this field isn't format-validated", () => {
+    const result = declineSchema.safeParse({ name: "Jamie Rivera", email: "not-an-email" });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts a reason at exactly the 200 character cap", () => {
+    expect(
+      declineSchema.safeParse({ name: "Jamie Rivera", reason: "x".repeat(200) }).success,
+    ).toBe(true);
+  });
+
+  it("rejects a reason over the 200 character cap", () => {
+    expect(
+      declineSchema.safeParse({ name: "Jamie Rivera", reason: "x".repeat(201) }).success,
+    ).toBe(false);
+  });
+
+  it("trims surrounding whitespace off the reason", () => {
+    const parsed = declineSchema.parse({ name: "Jamie Rivera", reason: "  hi  " });
+    expect(parsed.reason).toBe("hi");
+  });
+
+  it.each(["id", "cookieToken", "createdAt"])(
+    "rejects a body trying to set %s",
+    (field) => {
+      expect(
+        declineSchema.safeParse({ name: "Jamie Rivera", [field]: "anything" }).success,
+      ).toBe(false);
+    },
+  );
+});
+
+describe("declineReasonSchema", () => {
+  it("accepts an empty body, since reason is optional", () => {
+    expect(declineReasonSchema.safeParse({}).success).toBe(true);
+  });
+
+  it("accepts a reason", () => {
+    expect(declineReasonSchema.safeParse({ reason: "conflict with work" }).success).toBe(
+      true,
+    );
+  });
+
+  it.each(["name", "email"])(
+    "rejects a body containing %s, which isn't this schema's to give",
+    (field) => {
+      expect(
+        declineReasonSchema.safeParse({ reason: "hi", [field]: "anything" }).success,
+      ).toBe(false);
+    },
+  );
 });
