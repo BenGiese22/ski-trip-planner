@@ -21,6 +21,8 @@ type ResponseContextValue = {
   status: SaveStatus;
   lastSavedAt: number | null;
   problems: FinishProblem[];
+  /** True once a write has come back 404 — the identity cookie points at a row that's gone. */
+  sessionLost: boolean;
   /** Creates the row. Only call once intake is complete — see decision 7. */
   startResponse: (intake: IntakeInput) => Promise<{ ok: boolean; message?: string }>;
   /** Debounced autosave. Pass immediate for selects, toggles and blur. */
@@ -28,6 +30,10 @@ type ResponseContextValue = {
   setAvailability: (entries: AvailabilityEntry[]) => void;
   finish: () => Promise<{ ok: boolean; message?: string }>;
 };
+
+function isNotFound(err: unknown): boolean {
+  return err instanceof Error && (err as { status?: number }).status === 404;
+}
 
 const ResponseContext = createContext<ResponseContextValue | null>(null);
 
@@ -77,6 +83,16 @@ export function ResponseProvider({
 }) {
   const [response, setResponse] = useState<ClientResponse | null>(initialResponse);
   const [problems, setProblems] = useState<FinishProblem[]>([]);
+  const [sessionLost, setSessionLost] = useState(false);
+
+  // The row is confirmed gone (stale cookie, merged/deleted server-side) —
+  // starting fresh is the right next step here, not a risky one, so this
+  // clears state instead of leaving the autosave hooks to retry forever.
+  const handleSessionLost = useCallback(() => {
+    setResponse(null);
+    setProblems([]);
+    setSessionLost(true);
+  }, []);
 
   /**
    * Autosave responses are deliberately *not* written back into state. The
@@ -89,13 +105,29 @@ export function ResponseProvider({
    * finish", which is where its reply is applied.
    */
   const fields = useAutosave<RespondentPatch>(async (patch) => {
-    await postJson("/api/respondents", patch, "PATCH");
+    try {
+      await postJson("/api/respondents", patch, "PATCH");
+    } catch (err) {
+      if (isNotFound(err)) {
+        handleSessionLost();
+        return;
+      }
+      throw err;
+    }
   });
 
   const availability = useAutosave<{ entries: AvailabilityEntry[] }>(async (patch) => {
-    // Merge semantics land exactly right here: `entries` is the whole set, so
-    // the newest write wins, which is what replace-all wants.
-    await postJson("/api/availability", patch);
+    try {
+      // Merge semantics land exactly right here: `entries` is the whole set, so
+      // the newest write wins, which is what replace-all wants.
+      await postJson("/api/availability", patch);
+    } catch (err) {
+      if (isNotFound(err)) {
+        handleSessionLost();
+        return;
+      }
+      throw err;
+    }
   });
 
   const startResponse = useCallback(async (intake: IntakeInput) => {
@@ -194,6 +226,7 @@ export function ResponseProvider({
       status,
       lastSavedAt: Math.max(fields.lastSavedAt ?? 0, availability.lastSavedAt ?? 0) || null,
       problems,
+      sessionLost,
       startResponse,
       update,
       setAvailability,
@@ -205,6 +238,7 @@ export function ResponseProvider({
       fields.lastSavedAt,
       availability.lastSavedAt,
       problems,
+      sessionLost,
       startResponse,
       update,
       setAvailability,
