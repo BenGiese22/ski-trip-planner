@@ -452,10 +452,10 @@ below were made explicitly:
 
 2. **Autosave error state gets accurate messaging.** Section 6 describes error
    handling for autosave failures. Rather than surfacing a false "we'll keep
-   trying" claim when save fails, the error indicator now shows the actual
-   error. No retry button was added — considered but rejected in favor of
-   keeping the change minimal and letting the guest refresh or reach out
-   manually if needed.
+   trying" claim when save fails, the error indicator now shows a fixed,
+   accurate string ("Couldn't save your last change"). No retry button was
+   added — considered but rejected in favor of keeping the change minimal and
+   letting the guest refresh or reach out manually if needed.
 
 3. **The home page degrades gracefully when the database is unreachable.** When
    Postgres is down, `/` renders its full reference content — destinations,
@@ -466,11 +466,16 @@ below were made explicitly:
 
 4. **The availability grid's tablet tap-target problem is fixed via layout
    breakpoint.** Moving the 3-column grid breakpoint from `sm:` (640px) to
-   `md:` (768px) gives enough width on tablets for larger targets and cleaner
+   `lg:` (1024px) gives enough width on tablets for larger targets and cleaner
    spacing. The fix was verified with visual and screenshot review rather than
    adding a new dedicated Playwright device project, which would have added
    meaningfully to e2e runtime for a problem already covered by existing mobile
-   tests.
+   tests. *[Corrected during implementation: the breakpoint was first moved to
+   `md:` (768px), but Tailwind's `md:` is min-width-inclusive of exactly
+   768px — the same threshold as the old `sm:` — so it had no effect at the
+   primary tablet-portrait width the fix targeted. `lg:` (1024px), combined
+   with the app's `max-w-[980px]` container, correctly keeps the grid
+   single-column through the full tablet-portrait range.]*
 
 5. **The name/email autosave debounce bug is fixed using the existing path.**
    Keystroke-by-keystroke saves were being sent instead of using the debounce
@@ -487,6 +492,14 @@ below were made explicitly:
    The gutter was sized to hold the step-number badge; below the `sm:` (640px)
    breakpoint, the badge moves inline above the heading instead, reclaiming
    width on narrow screens.
+
+8. **Hero's decorative sun circle no longer renders as a stretched oval.** The
+   header's background SVG uses `preserveAspectRatio="none"` so its mountain
+   silhouettes fill the header at any aspect ratio; that same setting also
+   stretched the circle drawn inside it whenever the header's actual aspect
+   ratio didn't match the viewBox's 1000:300, which is most of the time.
+   Found during the mobile visual-review pass, not planned in advance; fixed
+   by moving the circle outside the SVG into a plain positioned `div`.
 
 **Note on scope:** the mobile-viewport Playwright suite already existed as a
 full test project before Phase 4 (running the entire suite at Pixel 7 width).
