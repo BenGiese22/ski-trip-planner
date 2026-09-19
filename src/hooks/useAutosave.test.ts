@@ -243,6 +243,26 @@ describe("useAutosave", () => {
     expect(result.current.status).toBe("saved");
   });
 
+  // A fresh edit is a fresh signal: it shouldn't inherit an exhausted retry
+  // count from whatever failed before it. Without the fix, this edit's first
+  // failure would immediately re-trip "error" instead of retrying and saving.
+  it("gives a fresh edit its own retry budget after a prior error", async () => {
+    const save = vi.fn().mockRejectedValue(new Error("network"));
+    const { result } = renderHook(() => useAutosave<Patch>(save, { maxRetries: 1 }));
+
+    act(() => result.current.queue({ notes: "a" }));
+    await advance(AUTOSAVE_DELAY_MS);
+    await advance(30_000);
+    expect(result.current.status).toBe("error");
+
+    save.mockRejectedValueOnce(new Error("network")).mockResolvedValue(undefined);
+    act(() => result.current.queue({ notes: "b" }));
+    await advance(AUTOSAVE_DELAY_MS);
+    await advance(30_000);
+
+    expect(result.current.status).toBe("saved");
+  });
+
   it("does not fire a pending save after unmount", async () => {
     const save = vi.fn().mockResolvedValue(undefined);
     const { result, unmount } = renderHook(() => useAutosave<Patch>(save));

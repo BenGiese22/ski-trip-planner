@@ -120,6 +120,11 @@ export function useAutosave<T extends object>(
 
   const queue = useCallback(
     (patch: Partial<T>) => {
+      // A fresh edit is a fresh signal — give it its own retry budget rather
+      // than inheriting an exhausted count from whatever failed before it.
+      // Without this, the very next save after an error had zero retries
+      // left and went straight back to "error" on a single failure.
+      attempts.current = 0;
       pending.current = { ...pending.current, ...patch };
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => runRef.current(), AUTOSAVE_DELAY_MS);
