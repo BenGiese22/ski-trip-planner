@@ -46,8 +46,7 @@ export function Hero() {
           trip built around resorts that pass already covers — everyone else
           can grab a short Ikon Session Pass for just the days they&rsquo;ll ski.
           This page is here to get a read on who&rsquo;s actually interested and
-          which dates could work, nothing&rsquo;s locked in yet. (Bonus: it
-          lines up with Ben&rsquo;s birthday.)
+          which dates could work, nothing&rsquo;s locked in yet.
         </p>
         <div className="flex gap-7 mt-8 flex-wrap">
           <div>
