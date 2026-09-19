@@ -1,6 +1,6 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
-import { ResponseProvider } from "./ResponseProvider";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ResponseProvider, useResponse } from "./ResponseProvider";
 import { WelcomeBack } from "./WelcomeBack";
 import type { ClientResponse } from "@/lib/serverSession";
 
@@ -88,5 +88,61 @@ describe("WelcomeBack", () => {
 
     renderWith(response({ plusOne: false }));
     expect(screen.getByText("Coming solo")).toBeVisible();
+  });
+});
+
+describe("WelcomeBack — first-time vs. returning", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("stays hidden the moment intake creates the row, not just before it", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ response: response({ name: "Jamie Rivera" }) }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    );
+
+    function StartButton() {
+      const { response: current, startResponse } = useResponse();
+      return (
+        <>
+          <div data-testid="response">{current ? "present" : "null"}</div>
+          <button
+            onClick={() =>
+              void startResponse({
+                name: "Jamie Rivera",
+                email: "jamie@example.com",
+                plusOne: false,
+                homeAirport: "SFO",
+                skiLevel: "intermediate",
+              })
+            }
+          >
+            start
+          </button>
+        </>
+      );
+    }
+
+    render(
+      <ResponseProvider initialResponse={null}>
+        <StartButton />
+        <WelcomeBack />
+      </ResponseProvider>,
+    );
+
+    expect(screen.queryByRole("heading", { name: /welcome back/i })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "start" }));
+    await waitFor(() => expect(screen.getByTestId("response")).toHaveTextContent("present"));
+
+    // The row now exists (this is what previously made WelcomeBack render),
+    // but this is a first-time visitor completing intake, not a return visit.
+    expect(screen.queryByRole("heading", { name: /welcome back/i })).toBeNull();
   });
 });

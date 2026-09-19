@@ -27,12 +27,13 @@ function response(overrides: Partial<ClientResponse> = {}): ClientResponse {
 
 /** Exposes context state and the two actions needed to drive it from a test. */
 function Harness() {
-  const { response: current, problems, sessionLost, update, finish } = useResponse();
+  const { response: current, problems, sessionLost, lastSavedAt, update, finish } = useResponse();
   return (
     <div>
       <div data-testid="response">{current ? "present" : "null"}</div>
       <div data-testid="problems">{problems.length}</div>
       <div data-testid="session-lost">{String(sessionLost)}</div>
+      <div data-testid="last-saved-at">{lastSavedAt ?? ""}</div>
       <button onClick={() => void finish()}>finish</button>
       <button onClick={() => update({ skiDays: 3 }, { immediate: true })}>update</button>
     </div>
@@ -86,5 +87,27 @@ describe("ResponseProvider — stale-session recovery", () => {
     expect(screen.getByTestId("response")).toHaveTextContent("null");
     expect(screen.getByTestId("problems")).toHaveTextContent("0");
     expect(screen.getByText(/start fresh below/i)).toBeVisible();
+  });
+});
+
+describe("ResponseProvider — finish() updates the save timestamp", () => {
+  it("bumps lastSavedAt on a successful finish even with nothing else pending", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ response: response({ submittedAt: "2027-01-01T00:00:00Z" }) }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    );
+
+    renderWith(response());
+
+    expect(screen.getByTestId("last-saved-at")).toHaveTextContent("");
+
+    fireEvent.click(screen.getByRole("button", { name: "finish" }));
+
+    await waitFor(() => expect(screen.getByTestId("last-saved-at")).not.toHaveTextContent(""));
   });
 });
