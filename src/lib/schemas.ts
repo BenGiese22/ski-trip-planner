@@ -101,3 +101,31 @@ export const availabilityBulkSchema = z.strictObject({
 });
 
 export type AvailabilityBulkInput = z.infer<typeof availabilityBulkSchema>;
+
+export const DECLINE_REASON_MAX = 200;
+
+const declineReasonField = z
+  .string()
+  .trim()
+  .max(DECLINE_REASON_MAX)
+  .optional();
+
+/**
+ * Entry point A: no respondent row exists yet, so the guest supplies who
+ * they are. Email is free text, not format-validated (contrast
+ * `emailSchema`) — it's optional and Ben reads it himself; rejecting a
+ * plausible-looking typo helps nobody here.
+ */
+export const declineSchema = z.strictObject({
+  name: nameSchema,
+  email: z.string().trim().optional(),
+  reason: declineReasonField,
+});
+export type DeclineInput = z.infer<typeof declineSchema>;
+
+/**
+ * Entry point B: a respondent row already says who they are — only the
+ * reason is theirs to give.
+ */
+export const declineReasonSchema = z.strictObject({ reason: declineReasonField });
+export type DeclineReasonInput = z.infer<typeof declineReasonSchema>;
