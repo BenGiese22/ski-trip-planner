@@ -47,8 +47,6 @@ test("the admin passcode gate has no detectable accessibility violations", async
   page,
 }) => {
   await page.goto("/admin");
-  // Wait past admin/loading.tsx's streaming fallback (no form) to the real
-  // passcode gate before scanning.
   await page.getByLabel("Passcode").waitFor();
 
   const results = await scan(page);
