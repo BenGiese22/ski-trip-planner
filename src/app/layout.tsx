@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Zilla_Slab, Inter, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -28,6 +28,15 @@ export const metadata: Metadata = {
   title,
   description,
   openGraph: { title, description },
+};
+
+// viewportFit: "cover" is what makes the safe-area-inset-* env() vars resolve
+// to the notch/home-indicator size on iOS instead of 0 — the sticky SaveBar
+// needs that to pad above the home indicator rather than sitting under it.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

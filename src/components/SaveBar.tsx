@@ -61,7 +61,12 @@ export function SaveBar() {
         </div>
       )}
 
-      <div className="max-w-[980px] mx-auto px-6 py-3 flex items-center justify-between gap-4 flex-wrap">
+      <div
+        className="max-w-[980px] mx-auto px-6 py-3 flex items-center justify-between gap-4 flex-wrap"
+        // iOS's home indicator overlaps a bar pinned to the viewport bottom
+        // without this — env() falls back to 0 wherever it's unsupported.
+        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+      >
         <p className="text-xs text-[#AEC4B7]" aria-live="polite">
           <span className={status === "error" ? "text-[#F6DAD6]" : "text-[#CFE0D5]"}>
             {STATUS_COPY[status]}
