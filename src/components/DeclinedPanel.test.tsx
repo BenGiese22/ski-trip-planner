@@ -1,13 +1,34 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DeclinedPanel } from "./DeclinedPanel";
 import { IntakeForm } from "./IntakeForm";
 import { ResponseProvider } from "./ResponseProvider";
-import type { ClientDecline } from "@/lib/serverSession";
+import type { ClientDecline, ClientResponse } from "@/lib/serverSession";
 
-function renderWith(decline: ClientDecline | null) {
+function response(overrides: Partial<ClientResponse> = {}): ClientResponse {
+  return {
+    name: "Jamie Rivera",
+    email: "jamie@example.com",
+    plusOne: false,
+    homeAirport: "SFO",
+    skiLevel: "intermediate",
+    skiDays: null,
+    alreadyHasPass: false,
+    gearStatus: null,
+    plusOneSkiDays: null,
+    plusOneAlreadyHasPass: false,
+    plusOneGearStatus: null,
+    notes: null,
+    submittedAt: null,
+    destinationRanking: [],
+    availability: [],
+    ...overrides,
+  };
+}
+
+function renderWith(decline: ClientDecline | null, current: ClientResponse | null = null) {
   return render(
-    <ResponseProvider initialResponse={null} initialDecline={decline}>
+    <ResponseProvider initialResponse={current} initialDecline={decline}>
       <DeclinedPanel />
       <IntakeForm />
     </ResponseProvider>,
@@ -52,5 +73,65 @@ describe("DeclinedPanel", () => {
     expect(fetchMock).not.toHaveBeenCalled();
     expect(screen.getByLabelText("Your name")).toBeVisible();
     expect(screen.queryByRole("heading", { name: /thanks for letting ben know/i })).toBeNull();
+  });
+});
+
+describe("DeclinedPanel — both rows, a respondent row already exists", () => {
+  it("shows the everything-you'd-filled-in body, regardless of reconsidering", () => {
+    renderWith({ name: "Jamie Rivera" }, response());
+    expect(
+      screen.getByRole("heading", { name: /thanks for letting ben know, jamie\./i }),
+    ).toBeVisible();
+    expect(screen.getByText(/everything you.d filled in is still here/i)).toBeVisible();
+  });
+
+  it("falls back to the response's name when the decline has none", () => {
+    renderWith({ name: null }, response({ name: "Alex Chen" }));
+    expect(
+      screen.getByRole("heading", { name: /thanks for letting ben know, alex\./i }),
+    ).toBeVisible();
+  });
+
+  it("undoes the decline with a DELETE and clears it on success", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    renderWith({ name: "Jamie Rivera" }, response());
+
+    fireEvent.click(screen.getByRole("button", { name: /actually, i can make it/i }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("heading", { name: /thanks for letting ben know/i })).toBeNull(),
+    );
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/declines");
+    expect(init.method).toBe("DELETE");
+  });
+
+  it("surfaces a failed undo and leaves the button clickable", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ error: "No dice." }), {
+          status: 404,
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    );
+    renderWith({ name: "Jamie Rivera" }, response());
+
+    const button = screen.getByRole("button", { name: /actually, i can make it/i });
+    fireEvent.click(button);
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("No dice."));
+    expect(button).toBeEnabled();
+    expect(
+      screen.getByRole("heading", { name: /thanks for letting ben know/i }),
+    ).toBeVisible();
   });
 });
