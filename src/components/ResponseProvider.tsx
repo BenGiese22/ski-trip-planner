@@ -33,6 +33,9 @@ type ResponseContextValue = {
   /** True after "Actually, I can make it" on a decline-only visit — reveals
    * IntakeForm client-side, writes nothing until intake is actually completed. */
   reconsidering: boolean;
+  /** A decline is on file and there's no respondent row to go with it — the
+   * `DeclinedPanel` (not `IntakeForm`) owns this slot until that changes. */
+  declinedOnly: boolean;
   reconsider: () => void;
   declineTrip: (body: DeclineInput | DeclineReasonInput) => Promise<{ ok: boolean; message?: string }>;
   undoDecline: () => Promise<{ ok: boolean; message?: string }>;
@@ -197,6 +200,12 @@ export function ResponseProvider({
       setDecline(null);
       return { ok: true };
     } catch (err) {
+      // A 404 here means "no decline on file for this browser" — already
+      // undone, e.g. by a second tab. That's success, not an error to dismiss.
+      if (isNotFound(err)) {
+        setDecline(null);
+        return { ok: true };
+      }
       return {
         ok: false,
         message:
@@ -293,6 +302,7 @@ export function ResponseProvider({
       justCreated,
       decline,
       reconsidering,
+      declinedOnly: decline !== null && response === null && !reconsidering,
       reconsider,
       declineTrip,
       undoDecline,

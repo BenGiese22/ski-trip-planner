@@ -247,6 +247,14 @@ describe("declineSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("rejects an email over the 254 character cap", () => {
+    const result = declineSchema.safeParse({
+      name: "Jamie Rivera",
+      email: `${"a".repeat(250)}@x.com`,
+    });
+    expect(result.success).toBe(false);
+  });
+
   it("accepts a reason at exactly the 200 character cap", () => {
     expect(
       declineSchema.safeParse({ name: "Jamie Rivera", reason: "x".repeat(200) }).success,

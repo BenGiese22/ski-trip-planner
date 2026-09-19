@@ -12,6 +12,10 @@ export const fieldClasses =
 export const labelClasses =
   "block font-mono text-[11px] uppercase tracking-wide text-ink-soft mb-1.5";
 
+export const primaryButtonClasses =
+  "text-sm text-paper bg-pine px-4 py-2.5 rounded-md hover:bg-pine-dark " +
+  "disabled:opacity-60 focus:outline-2 focus:outline-offset-2 focus:outline-pine";
+
 export function FieldError({ id, message }: { id: string; message?: string }) {
   if (!message) return null;
   return (
@@ -19,4 +23,8 @@ export function FieldError({ id, message }: { id: string; message?: string }) {
       {message}
     </p>
   );
+}
+
+export function firstNameOf(name: string): string {
+  return name.trim().split(/\s+/)[0];
 }

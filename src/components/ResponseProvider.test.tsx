@@ -34,6 +34,7 @@ function Harness() {
     lastSavedAt,
     decline,
     reconsidering,
+    declinedOnly,
     update,
     finish,
     startResponse,
@@ -49,6 +50,7 @@ function Harness() {
       <div data-testid="last-saved-at">{lastSavedAt ?? ""}</div>
       <div data-testid="decline">{decline ? "present" : "null"}</div>
       <div data-testid="reconsidering">{String(reconsidering)}</div>
+      <div data-testid="declined-only">{String(declinedOnly)}</div>
       <button onClick={() => void finish()}>finish</button>
       <button onClick={() => update({ skiDays: 3 }, { immediate: true })}>update</button>
       <button
@@ -157,6 +159,27 @@ describe("ResponseProvider — decline state", () => {
 
     renderWith(response(), { name: "Jamie Rivera" });
 
+    expect(screen.getByTestId("decline")).toHaveTextContent("present");
+
+    fireEvent.click(screen.getByRole("button", { name: "undo-decline" }));
+
+    await waitFor(() => expect(screen.getByTestId("decline")).toHaveTextContent("null"));
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/declines",
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+
+  it("undoDecline treats a 404 (already undone elsewhere) as success", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ error: "No \"can't make it\" on file for this browser." }), {
+        status: 404,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWith(response(), { name: "Jamie Rivera" });
     expect(screen.getByTestId("decline")).toHaveTextContent("present");
 
     fireEvent.click(screen.getByRole("button", { name: "undo-decline" }));

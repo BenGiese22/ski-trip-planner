@@ -29,13 +29,12 @@ export async function POST(request: Request) {
   const parsed = intakeSchema.safeParse(await readJson(request));
   if (!parsed.success) return badRequest(parsed.error);
 
-  const existing = await currentRespondent();
+  const [existing, decline] = await Promise.all([currentRespondent(), currentDecline()]);
   if (existing) {
     const updated = await updateRespondent(existing, parsed.data);
     return NextResponse.json({ response: await loadClientResponse(updated) });
   }
 
-  const decline = await currentDecline();
   const token = createCookieToken();
   const created = decline
     ? await replaceDeclineWithRespondent(parsed.data, decline.cookieToken, token)
