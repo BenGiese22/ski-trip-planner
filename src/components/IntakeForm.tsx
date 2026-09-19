@@ -3,6 +3,7 @@
 import { useId, useState, type FormEvent } from "react";
 import { airports } from "@/data/airports";
 import { intakeSchema, type IntakeInput } from "@/lib/schemas";
+import { FieldError, fieldClasses, labelClasses } from "./formPrimitives";
 import { useResponse } from "./ResponseProvider";
 
 const SKI_LEVELS = [
@@ -10,13 +11,6 @@ const SKI_LEVELS = [
   { value: "intermediate", label: "Intermediate" },
   { value: "advanced", label: "Advanced" },
 ] as const;
-
-// iOS Safari zooms the whole page in on focus for any input/select under 16px.
-const fieldClasses =
-  "w-full border border-line rounded-md px-3 py-2.5 text-base sm:text-sm bg-paper text-ink " +
-  "focus:outline-2 focus:outline-offset-2 focus:outline-pine";
-
-const labelClasses = "block font-mono text-[11px] uppercase tracking-wide text-ink-soft mb-1.5";
 
 type Draft = {
   name: string;
@@ -222,14 +216,5 @@ export function IntakeForm() {
         </p>
       )}
     </form>
-  );
-}
-
-function FieldError({ id, message }: { id: string; message?: string }) {
-  if (!message) return null;
-  return (
-    <p id={id} className="text-xs text-rust mt-1">
-      {message}
-    </p>
   );
 }
