@@ -7,7 +7,7 @@ const STATUS_COPY = {
   idle: "Every answer saves itself as you go",
   saving: "Saving…",
   saved: "Saved",
-  error: "Couldn't save — we'll keep trying",
+  error: "Couldn't save your last change",
 } as const;
 
 function agoLabel(timestamp: number): string {
