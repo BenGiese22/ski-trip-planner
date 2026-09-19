@@ -8,8 +8,8 @@ import { useResponse } from "./ResponseProvider";
  * the "we know who you are" header above the editable form.
  */
 export function WelcomeBack() {
-  const { response, justCreated } = useResponse();
-  if (!response || justCreated) return null;
+  const { response, justCreated, decline } = useResponse();
+  if (!response || justCreated || decline) return null;
 
   const firstName = response.name.trim().split(/\s+/)[0];
   const marked = response.availability.filter((day) => day.status !== "unavailable").length;

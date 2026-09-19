@@ -1,5 +1,7 @@
 import { AvailabilityGrid } from "@/components/AvailabilityGrid";
+import { CantMakeIt } from "@/components/CantMakeIt";
 import { CostSection } from "@/components/CostSection";
+import { DeclinedPanel } from "@/components/DeclinedPanel";
 import { DestinationRanker } from "@/components/DestinationRanker";
 import { FlightCards } from "@/components/FlightCards";
 import { Footer } from "@/components/Footer";
@@ -11,6 +13,7 @@ import { Section } from "@/components/Section";
 import { SessionLostNotice } from "@/components/SessionLostNotice";
 import { SourceLine } from "@/components/SourceLine";
 import { WelcomeBack } from "@/components/WelcomeBack";
+import { YouSubtitle } from "@/components/YouSubtitle";
 import { passInfo, passSources } from "@/data/passInfo";
 import { loadInitialResponse } from "@/lib/serverSession";
 
@@ -37,13 +40,10 @@ export default async function Home() {
           </p>
         )}
         <SessionLostNotice />
-        <Section
-          id="you"
-          number="01"
-          title="You"
-          subtitle="Five quick questions, and the rest of the page tailors itself to your answers. Nothing here is a commitment."
-        >
+        <Section id="you" number="01" title="You" subtitle={<YouSubtitle />}>
+          <DeclinedPanel />
           <WelcomeBack />
+          <CantMakeIt />
           <IntakeForm />
         </Section>
 

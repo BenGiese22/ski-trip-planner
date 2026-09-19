@@ -10,7 +10,7 @@ export function Section({
   id: string;
   number: string;
   title: string;
-  subtitle?: string;
+  subtitle?: ReactNode;
   children: ReactNode;
 }) {
   const badgeClasses =
