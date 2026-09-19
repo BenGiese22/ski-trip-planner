@@ -63,6 +63,9 @@ Home airport is captured in the intake step specifically so the "getting there" 
 **Guest, return visit**
 Cookie recognized → show "welcome back, here's what you told us" with their answers pre-filled and editable, plus the reference content (destinations, cost breakdown, flight links) still browsable underneath, same as a first-time visitor.
 
+**Guest, can't attend**
+Bowing out before ever starting intake swaps in a short name/email/reason form instead of the destination-and-dates flow; bowing out after already answering just asks for a reason, since name and email are already on file. Either way the same cookie mechanism recognizes them on return and shows the decline as already on file, same as any other saved answer.
+
 **Benjamin, admin view**
 A separate, lightly protected route (`/admin`) showing: response count, an availability heatmap across the whole candidate date range, a destination preference tally, and a per-person cost estimate table driven by each guest's stated airport and ski-ability inputs.
 
@@ -117,6 +120,17 @@ create table destination_votes (
   destination_slug text not null,
   rank            int not null,              -- 1 = first choice
   primary key (respondent_id, destination_slug)
+);
+
+-- one row per browser that has said "can't make it" — independent of
+-- respondents, so it works for someone who never started intake
+create table declines (
+  id            uuid primary key default gen_random_uuid(),
+  cookie_token  uuid not null unique,        -- same cookie as respondents.cookie_token, when both exist
+  name          text,
+  email         text,
+  reason        text,
+  created_at    timestamptz not null default now()
 );
 ```
 
@@ -236,6 +250,7 @@ Render these as small "source" links under the relevant card/section in the UI (
 /admin                passcode-gated: heatmap, tally, cost rollup
 /api/respondents       POST create/update, GET (admin only)
 /api/availability      POST bulk-upsert day statuses
+/api/declines          POST create/edit, DELETE undo (direction B only)
 ```
 
 `/getting-there` depends on `home_airport` already being on the respondent's row from intake — if someone lands on this route directly (shared link, revisit) without having completed intake, redirect them back to `/` rather than showing an airport picker here. Keep the personalization logic (which airport's card to render) server-side, resolved from the same cookie-linked respondent row used everywhere else, not from a client-side query param that could be shared or bookmarked with someone else's airport.
@@ -510,4 +525,91 @@ Phase 4 added a dedicated `e2e/mobile.spec.ts` with touch-specific assertions
 sizes) rather than standing up mobile coverage from scratch.
 
 These decisions supersede the corresponding details in sections 6, 8, and 14
+above where they conflict; the rest of those sections still apply as written.
+
+---
+
+## 19. Decline / can't-attend decisions (confirmed before implementation started)
+
+Phase 4 is complete, merged to `main`, and live. Before writing the decline
+feature, the following decisions were made explicitly, resolving how "I can't
+make it" fits into a schema and an admin view that were both built assuming
+every response was a yes:
+
+1. **Separate `declines` table, not a flag on `respondents`.** `respondents`
+   doesn't accept a partial row — `name`, `email`, `home_airport`, and
+   `ski_level` are all `NOT NULL` (section 16, decision 7: nothing is written
+   until intake is fully complete), so there's no half-filled respondent shape
+   a decline could reuse. A decline also has nothing to put in those
+   columns — no airport, no ski level to give — so a flag on `respondents`
+   would mean either relaxing those `NOT NULL`s for everyone or leaving them
+   meaninglessly filled. A standalone table, with its own nullable columns for
+   what a decline actually has (name, email, reason), fits what's really there.
+
+2. **Same cookie token can live in both tables at once — no relationship
+   between them.** `declines.cookie_token` carries its own `UNIQUE` constraint
+   and no `references()` call to `respondents`, the same pattern `rate_limits`
+   already uses for a caller with no respondent row at all. A guest who's
+   already submitted keeps their `respondents` row untouched if they decline
+   afterward — the two rows about the same browser coexist, and nothing in the
+   schema stops that.
+
+3. **Precedence rule: a decline overrides every admin aggregate; the two raw
+   counts stay disjoint by construction.** `countedForAdmin()` in
+   `src/db/queries.ts` is `submitted_at IS NOT NULL AND NOT EXISTS (SELECT 1
+   FROM declines WHERE declines.cookie_token = respondents.cookie_token)` —
+   every admin query (`countSubmittedRespondents`, `availabilityCountsByDate`,
+   `listSubmittedDestinationRankings`, `listSubmittedRespondentsWithTopChoice`)
+   filters through it, so a respondent who's since declined drops out of all
+   of them, even though their row is untouched. `countDeclines()` counts every
+   row in `declines`, unfiltered, and that's correct precisely because
+   `countedForAdmin()` already pulled anyone with a decline out of the
+   respondent-side counts first — the two numbers never double-count the same
+   browser.
+
+4. **Two entry points, one component, and the server picks the schema
+   itself.** `CantMakeIt` (`src/components/CantMakeIt.tsx`) renders one of two
+   forms depending on whether the guest already has a response, but the
+   server doesn't trust that render choice — `POST /api/declines`
+   (`src/app/api/declines/route.ts`) calls `currentRespondent()` itself and
+   picks `declineReasonSchema` (a respondent row exists, only a reason is
+   asked) or `declineSchema` (no respondent row, name/email/reason are all
+   asked). For the first case, name and email on the new decline row are
+   copied server-side from the existing respondent row rather than taken from
+   the request — `declineReasonSchema` doesn't even accept those fields.
+
+5. **Undo is asymmetric because the two directions start from different
+   states.** Direction A — declined first, no respondent row —
+   `replaceDeclineWithRespondent()` deletes the decline and inserts a fresh
+   respondent row with a new cookie token in one transaction, invoked from the
+   regular intake path rather than a dedicated undo endpoint: completing
+   intake *is* the undo. Direction B — a respondent row already existed, then
+   declined — is undone via `DELETE /api/declines`, which requires
+   `currentRespondent()` to resolve and returns 409 ("There's no way to undo
+   this without an existing response") when it can't. That combination — a
+   call to this endpoint with no respondent row on file — shouldn't occur
+   given the UI only ever calls `DELETE` from within an existing response; the
+   409 guards it anyway rather than silently doing nothing.
+
+6. **No admin list of names, reasons, or emails — ever.** `src/app/admin/page.tsx`
+   calls `countDeclines()` and renders only the number; nothing in the app
+   reads `name`, `email`, or `reason` back out of `declines` anywhere else.
+   Anything more granular than the count is a direct database query Ben runs
+   himself.
+
+7. **`reason` is capped at 200 characters; the decline email is free text.**
+   `DECLINE_REASON_MAX = 200` in `src/lib/schemas.ts` bounds `reason` on both
+   `declineSchema` and `declineReasonSchema`. Email on the decline form is
+   `z.string().trim().optional()` — no format check — unlike `emailSchema`
+   (`z.email(...).max(254)`) used throughout intake: it's optional, Ben reads
+   it himself, and rejecting a plausible-looking typo helps nobody here.
+
+8. **Shipped without gating on the production migration.** `drizzle/0001_declines.sql`'s
+   `CREATE TABLE declines` needs to be pasted into Supabase's SQL editor after
+   this branch merges — the same manual step `drizzle/0000_phase2_initial.sql`
+   needed in Phase 2 (section 12), and for the same reason: the production
+   Postgres connection string is a Vercel Sensitive variable, unreadable by
+   any migration tool run from outside Vercel's own infrastructure.
+
+These decisions supersede the corresponding details in sections 5 and 10
 above where they conflict; the rest of those sections still apply as written.
