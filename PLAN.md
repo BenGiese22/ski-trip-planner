@@ -431,3 +431,68 @@ settled.
 
 These decisions supersede the corresponding details in sections 3, 6, 7, 8 and
 14 above where they conflict; the rest of those sections still apply as written.
+
+---
+
+## 18. Phase 4 implementation decisions (confirmed before implementation started)
+
+Phase 3 is complete, merged to `main`, and live. Phase 4 as originally written
+in section 11 was partly delivered incidentally during earlier phases — the
+mobile Playwright test suite was already in place, a sideways-scroll regression
+test came in Phase 3, admin empty/error states were built then, and the save-bar's
+error state was already in place before Phase 4 began. Rather than a from-scratch
+polish sweep, Phase 4 became a targeted set of bug fixes and gaps. The decisions
+below were made explicitly:
+
+1. **The `notes` field and admin roster view are deferred.** The backend is
+   fully plumbed — schema, validation, and PATCH route all exist — but
+   surfacing `notes` in the UI and building a roster view were deliberately cut
+   from this phase to keep scope bounded. Both are ready to pick up in a later
+   phase without rework; the infrastructure is there.
+
+2. **Autosave error state gets accurate messaging.** Section 6 describes error
+   handling for autosave failures. Rather than surfacing a false "we'll keep
+   trying" claim when save fails, the error indicator now shows the actual
+   error. No retry button was added — considered but rejected in favor of
+   keeping the change minimal and letting the guest refresh or reach out
+   manually if needed.
+
+3. **The home page degrades gracefully when the database is unreachable.** When
+   Postgres is down, `/` renders its full reference content — destinations,
+   costs, flights — with an inline notice that saved answers couldn't load,
+   matching the pattern `/admin` already follows. A guest with a dead
+   identity-cookie lookup can still read and explore the trip; they just can't
+   save responses until service recovers.
+
+4. **The availability grid's tablet tap-target problem is fixed via layout
+   breakpoint.** Moving the 3-column grid breakpoint from `sm:` (640px) to
+   `md:` (768px) gives enough width on tablets for larger targets and cleaner
+   spacing. The fix was verified with visual and screenshot review rather than
+   adding a new dedicated Playwright device project, which would have added
+   meaningfully to e2e runtime for a problem already covered by existing mobile
+   tests.
+
+5. **The name/email autosave debounce bug is fixed using the existing path.**
+   Keystroke-by-keystroke saves were being sent instead of using the debounce
+   already written and already tested in the codebase. Plugging the intake form
+   into that path required no new logic, only wiring the existing mechanism
+   where it was missing.
+
+6. **OpenGraph metadata is added for link previews.** When the app is shared in
+   a group chat, the preview now carries a clean title and description (no
+   image, consistent with the site's no-stock-photo visual stance). This is
+   pure content work, no dynamic per-route logic.
+
+7. **The `Section` component's fixed left gutter is collapsed on phone widths.**
+   The gutter was sized to hold the step-number badge; below the `sm:` (640px)
+   breakpoint, the badge moves inline above the heading instead, reclaiming
+   width on narrow screens.
+
+**Note on scope:** the mobile-viewport Playwright suite already existed as a
+full test project before Phase 4 (running the entire suite at Pixel 7 width).
+Phase 4 added a dedicated `e2e/mobile.spec.ts` with touch-specific assertions
+(tap-to-cycle, sideways-scroll across more app states, minimum tap-target
+sizes) rather than standing up mobile coverage from scratch.
+
+These decisions supersede the corresponding details in sections 6, 8, and 14
+above where they conflict; the rest of those sections still apply as written.
