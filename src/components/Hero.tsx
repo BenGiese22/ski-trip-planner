@@ -9,7 +9,6 @@ export function Hero() {
         role="img"
         aria-hidden="true"
       >
-        <circle cx="845" cy="70" r="34" fill="#D99B12" opacity="0.85" />
         <g opacity="0.5" stroke="#D99B12" strokeWidth="1.5" fill="none" strokeDasharray="2 7">
           <path d="M0,40 Q250,10 500,40 T1000,40" />
           <path d="M0,68 Q250,40 500,68 T1000,68" />
@@ -27,6 +26,14 @@ export function Hero() {
           fill="#152A20"
         />
       </svg>
+      {/* A perfect circle, unlike the mountains above: `preserveAspectRatio="none"`
+          stretches anything drawn inside that SVG's non-square viewBox into an
+          oval whenever the header's aspect ratio doesn't match 1000:300, which
+          is most of the time. Sitting outside that viewBox keeps it round. */}
+      <div
+        aria-hidden="true"
+        className="absolute z-0 left-[84.5%] top-[23.3%] -translate-x-1/2 -translate-y-1/2 w-[6.8vw] h-[6.8vw] rounded-full bg-gold opacity-[0.85]"
+      />
       <div className="relative z-10 max-w-[980px] mx-auto px-6">
         <p className="font-mono text-xs tracking-[0.14em] text-gold uppercase mb-3.5">
           An early interest check — nothing&rsquo;s booked yet
