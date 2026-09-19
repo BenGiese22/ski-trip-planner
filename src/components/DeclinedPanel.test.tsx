@@ -113,12 +113,32 @@ describe("DeclinedPanel — both rows, a respondent row already exists", () => {
     expect(init.method).toBe("DELETE");
   });
 
-  it("surfaces a failed undo and leaves the button clickable", async () => {
+  it("treats a 404 undo (already undone elsewhere) as success, not an error", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
         new Response(JSON.stringify({ error: "No dice." }), {
           status: 404,
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    );
+    renderWith({ name: "Jamie Rivera" }, response());
+
+    fireEvent.click(screen.getByRole("button", { name: /actually, i can make it/i }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("heading", { name: /thanks for letting ben know/i })).toBeNull(),
+    );
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("surfaces a failed undo and leaves the button clickable", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ error: "No dice." }), {
+          status: 409,
           headers: { "content-type": "application/json" },
         }),
       ),

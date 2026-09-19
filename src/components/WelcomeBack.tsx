@@ -1,5 +1,6 @@
 "use client";
 
+import { firstNameOf } from "./formPrimitives";
 import { useResponse } from "./ResponseProvider";
 
 /**
@@ -11,7 +12,7 @@ export function WelcomeBack() {
   const { response, justCreated, decline } = useResponse();
   if (!response || justCreated || decline) return null;
 
-  const firstName = response.name.trim().split(/\s+/)[0];
+  const firstName = firstNameOf(response.name);
   const marked = response.availability.filter((day) => day.status !== "unavailable").length;
 
   return (

@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { findDeclineByToken, upsertDecline, deleteDeclineByToken } from "@/db/queries";
+import {
+  findRespondentByToken,
+  findDeclineByToken,
+  upsertDecline,
+  deleteDeclineByToken,
+} from "@/db/queries";
 import { badRequest, guestWriteLimit, readJson } from "@/lib/api";
 import { declineSchema, declineReasonSchema } from "@/lib/schemas";
 import {
@@ -16,7 +21,8 @@ import { currentRespondent, currentCookieToken, toClientDecline } from "@/lib/se
  *
  * - Entry point B — a respondent row already exists. Name/email are already
  *   known, so only a reason is accepted, and the identity cookie is left
- *   untouched since it already points at that respondent.
+ *   untouched since it already points at that respondent. Edits an existing
+ *   decline in place (200) or creates one (201), same as entry point A.
  * - Entry point A — no respondent row. The guest supplies name/email
  *   themselves. A cookie that already resolves to a decline edits it in
  *   place (200); anyone else gets a fresh token and a new row (201).
@@ -28,47 +34,41 @@ export async function POST(request: Request) {
   const limited = await guestWriteLimit(request);
   if (limited) return limited;
 
-  const respondent = await currentRespondent();
+  const token = await currentCookieToken();
+  const respondent = token ? await findRespondentByToken(token) : null;
+
   if (respondent) {
     const parsed = declineReasonSchema.safeParse(await readJson(request));
     if (!parsed.success) return badRequest(parsed.error);
 
+    const existingDecline = await findDeclineByToken(respondent.cookieToken);
     const decline = await upsertDecline(
       { name: respondent.name, email: respondent.email, reason: parsed.data.reason ?? null },
       respondent.cookieToken,
     );
-    return NextResponse.json({ decline: toClientDecline(decline) }, { status: 201 });
+    return NextResponse.json(
+      { decline: toClientDecline(decline) },
+      { status: existingDecline ? 200 : 201 },
+    );
   }
 
   const parsed = declineSchema.safeParse(await readJson(request));
   if (!parsed.success) return badRequest(parsed.error);
 
-  const token = await currentCookieToken();
-  if (token) {
-    const existing = await findDeclineByToken(token);
-    if (existing) {
-      const decline = await upsertDecline(
-        {
-          name: parsed.data.name,
-          email: parsed.data.email ?? null,
-          reason: parsed.data.reason ?? null,
-        },
-        token,
-      );
-      return NextResponse.json({ decline: toClientDecline(decline) });
-    }
+  const payload = {
+    name: parsed.data.name,
+    email: parsed.data.email ?? null,
+    reason: parsed.data.reason ?? null,
+  };
+
+  const existing = token ? await findDeclineByToken(token) : null;
+  if (existing) {
+    const decline = await upsertDecline(payload, token as string);
+    return NextResponse.json({ decline: toClientDecline(decline) });
   }
 
   const newToken = createCookieToken();
-  const decline = await upsertDecline(
-    {
-      name: parsed.data.name,
-      email: parsed.data.email ?? null,
-      reason: parsed.data.reason ?? null,
-    },
-    newToken,
-  );
-
+  const decline = await upsertDecline(payload, newToken);
   const response = NextResponse.json({ decline: toClientDecline(decline) }, { status: 201 });
   response.cookies.set(
     IDENTITY_COOKIE,

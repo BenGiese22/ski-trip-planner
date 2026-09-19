@@ -2,11 +2,8 @@
 
 import { useState } from "react";
 import type { ClientDecline, ClientResponse } from "@/lib/serverSession";
+import { firstNameOf, primaryButtonClasses } from "./formPrimitives";
 import { useResponse } from "./ResponseProvider";
-
-const buttonClasses =
-  "text-sm text-paper bg-pine px-4 py-2.5 rounded-md mt-3.5 hover:bg-pine-dark " +
-  "disabled:opacity-60 focus:outline-2 focus:outline-offset-2 focus:outline-pine";
 
 /**
  * What a guest who bowed out sees on their way back in — the mirror of
@@ -21,7 +18,7 @@ export function DeclinedPanel() {
   if (response) return <BothRowsPanel decline={decline} response={response} />;
   if (reconsidering) return null;
 
-  const firstName = decline.name?.trim().split(/\s+/)[0];
+  const firstName = decline.name ? firstNameOf(decline.name) : undefined;
 
   return (
     <div className="bg-green-tint border border-[#BFD9C4] rounded-xl p-5 mb-3.5">
@@ -32,7 +29,7 @@ export function DeclinedPanel() {
         You said you can&rsquo;t make it this time. If that changes, you can
         still fill in a response — nothing&rsquo;s locked.
       </p>
-      <button type="button" onClick={reconsider} className={buttonClasses}>
+      <button type="button" onClick={reconsider} className={`${primaryButtonClasses} mt-3.5`}>
         Actually, I can make it
       </button>
     </div>
@@ -53,7 +50,7 @@ function BothRowsPanel({
   const { undoDecline } = useResponse();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const firstName = (decline.name ?? response.name).trim().split(/\s+/)[0];
+  const firstName = firstNameOf(decline.name ?? response.name);
 
   async function onUndo() {
     setSubmitting(true);
@@ -71,7 +68,12 @@ function BothRowsPanel({
         you&rsquo;d filled in is still here and nothing&rsquo;s locked — if
         plans change, one click puts you back in.
       </p>
-      <button type="button" onClick={onUndo} disabled={submitting} className={buttonClasses}>
+      <button
+        type="button"
+        onClick={onUndo}
+        disabled={submitting}
+        className={`${primaryButtonClasses} mt-3.5`}
+      >
         {submitting ? "Saving…" : "Actually, I can make it"}
       </button>
       {error && (

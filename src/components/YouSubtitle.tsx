@@ -8,9 +8,9 @@ import { useResponse } from "./ResponseProvider";
  * browsable, so the replacement says that rather than shutting the door.
  */
 export function YouSubtitle() {
-  const { response, decline, reconsidering } = useResponse();
+  const { declinedOnly } = useResponse();
 
-  if (decline && !response && !reconsidering) {
+  if (declinedOnly) {
     return (
       <>
         You&rsquo;ve let Ben know you can&rsquo;t make it — the rest of the page

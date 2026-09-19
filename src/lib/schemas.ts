@@ -118,7 +118,7 @@ const declineReasonField = z
  */
 export const declineSchema = z.strictObject({
   name: nameSchema,
-  email: z.string().trim().optional(),
+  email: z.string().trim().max(254).optional(),
   reason: declineReasonField,
 });
 export type DeclineInput = z.infer<typeof declineSchema>;
