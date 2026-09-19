@@ -82,7 +82,7 @@ export async function currentRespondent(): Promise<Respondent | null> {
  */
 export type ClientDecline = { name: string | null };
 
-function toClientDecline(decline: Decline): ClientDecline {
+export function toClientDecline(decline: Decline): ClientDecline {
   return { name: decline.name };
 }
 
