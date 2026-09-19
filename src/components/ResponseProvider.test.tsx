@@ -42,7 +42,7 @@ function Harness() {
 
 const renderWith = (value: ClientResponse | null) =>
   render(
-    <ResponseProvider initialResponse={value}>
+    <ResponseProvider initialResponse={value} initialDecline={null}>
       <Harness />
       <SessionLostNotice />
     </ResponseProvider>,

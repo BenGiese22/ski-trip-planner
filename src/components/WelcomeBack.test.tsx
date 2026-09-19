@@ -27,7 +27,7 @@ function response(overrides: Partial<ClientResponse> = {}): ClientResponse {
 
 const renderWith = (value: ClientResponse | null) =>
   render(
-    <ResponseProvider initialResponse={value}>
+    <ResponseProvider initialResponse={value} initialDecline={null}>
       <WelcomeBack />
     </ResponseProvider>,
   );
@@ -130,7 +130,7 @@ describe("WelcomeBack — first-time vs. returning", () => {
     }
 
     render(
-      <ResponseProvider initialResponse={null}>
+      <ResponseProvider initialResponse={null} initialDecline={null}>
         <StartButton />
         <WelcomeBack />
       </ResponseProvider>,

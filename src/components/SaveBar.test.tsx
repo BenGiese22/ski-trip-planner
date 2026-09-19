@@ -27,7 +27,7 @@ function response(overrides: Partial<ClientResponse> = {}): ClientResponse {
 
 const renderWith = (value: ClientResponse | null) =>
   render(
-    <ResponseProvider initialResponse={value}>
+    <ResponseProvider initialResponse={value} initialDecline={null}>
       <SaveBar />
     </ResponseProvider>,
   );
