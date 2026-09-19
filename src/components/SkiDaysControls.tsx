@@ -92,7 +92,10 @@ function PersonControls({
         {copy.heading}
       </legend>
 
-      <div className="flex gap-2 flex-wrap mt-1">
+      <p className="font-mono text-[10px] uppercase tracking-wide text-ink-soft mt-1.5 mb-1.5">
+        Days / pass
+      </p>
+      <div className="flex gap-2 flex-wrap">
         {SKI_DAY_OPTIONS.map((days) => (
           <Option
             key={days}
@@ -122,7 +125,10 @@ function PersonControls({
         </Option>
       </div>
 
-      <div className="flex gap-2 flex-wrap mt-2.5">
+      <hr className="border-line my-3" />
+
+      <p className="font-mono text-[10px] uppercase tracking-wide text-ink-soft mb-1.5">Gear</p>
+      <div className="flex gap-2 flex-wrap">
         <Option
           selected={gearStatus === "own"}
           onClick={() => set({ [patchKeys.gearStatus]: "own" } as RespondentPatch)}
