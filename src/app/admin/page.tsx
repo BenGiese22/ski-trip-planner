@@ -8,6 +8,7 @@ import { AdminLogoutButton } from "@/components/AdminLogoutButton";
 import { EmptyState } from "@/components/EmptyState";
 import {
   availabilityCountsByDate,
+  countDeclines,
   countSubmittedRespondents,
   listSubmittedDestinationRankings,
   listSubmittedRespondentsWithTopChoice,
@@ -116,13 +117,14 @@ async function AdminDashboard() {
   // error states as part of done).
   let data;
   try {
-    const [totalRespondents, counts, rankings, costEntries] = await Promise.all([
+    const [totalRespondents, counts, rankings, costEntries, declineCount] = await Promise.all([
       countSubmittedRespondents(),
       availabilityCountsByDate(),
       listSubmittedDestinationRankings(),
       listSubmittedRespondentsWithTopChoice(),
+      countDeclines(),
     ]);
-    data = { totalRespondents, counts, rankings, costEntries };
+    data = { totalRespondents, counts, rankings, costEntries, declineCount };
   } catch {
     return (
       <div data-testid="admin-dashboard">
@@ -134,7 +136,7 @@ async function AdminDashboard() {
     );
   }
 
-  const { totalRespondents, counts, rankings, costEntries } = data;
+  const { totalRespondents, counts, rankings, costEntries, declineCount } = data;
 
   // One shared message stands in for what used to be a separate "nothing
   // yet" statement under each of the three sections below — the first
@@ -146,6 +148,13 @@ async function AdminDashboard() {
         <EmptyState>
           Nobody&rsquo;s finished a response yet — this page fills in once
           people do.
+          {declineCount > 0 && (
+            <>
+              {" "}
+              {declineCount === 1 ? "1 person has" : `${declineCount} people have`} said
+              they can&rsquo;t make it.
+            </>
+          )}
         </EmptyState>
       </div>
     );
@@ -157,6 +166,13 @@ async function AdminDashboard() {
         <strong className="text-ink font-mono">{totalRespondents}</strong>{" "}
         {totalRespondents === 1 ? "person has" : "people have"} finished their
         response.
+        {declineCount > 0 && (
+          <>
+            {" "}
+            · <strong className="text-ink font-mono">{declineCount}</strong> can&rsquo;t
+            make it
+          </>
+        )}
       </p>
 
       <section className="mb-10">

@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, lt, sql } from "drizzle-orm";
+import { and, eq, isNotNull, lt, notExists, sql } from "drizzle-orm";
 import type { DestinationSlug } from "@/data/types";
 import type { DayCount } from "@/lib/availabilityHeatmap";
 import type { AvailabilityBulkInput, IntakeInput, RespondentPatch } from "@/lib/schemas";
@@ -251,14 +251,34 @@ export async function hitRateLimit(
 
 /**
  * Admin reads. Every one of these is filtered to submitted responses only
- * (PLAN.md §17 decision 3) — an abandoned half-filled row shouldn't move any
- * of Ben's numbers.
+ * (PLAN.md §17 decision 3), minus anyone who's since said they can't make it
+ * (§19) — see `countedForAdmin` below.
  */
+
+/**
+ * What "counts" on /admin: a finished response (§17 decision 3) from
+ * someone who hasn't since said they can't make it (§19). A decline
+ * overrides the response outright — the raw row stays in the database for
+ * Ben to look at, but no aggregate reflects it. Correlated on cookie_token,
+ * the only thing the two tables share.
+ */
+function countedForAdmin() {
+  return and(
+    isNotNull(respondents.submittedAt),
+    notExists(
+      getDb()
+        .select({ one: sql`1` })
+        .from(declines)
+        .where(eq(declines.cookieToken, respondents.cookieToken)),
+    ),
+  );
+}
+
 export async function countSubmittedRespondents(): Promise<number> {
   const [row] = await getDb()
     .select({ count: sql<number>`count(*)::int` })
     .from(respondents)
-    .where(isNotNull(respondents.submittedAt));
+    .where(countedForAdmin());
   return row?.count ?? 0;
 }
 
@@ -276,7 +296,7 @@ export async function availabilityCountsByDate(): Promise<DayCount[]> {
     })
     .from(availability)
     .innerJoin(respondents, eq(availability.respondentId, respondents.id))
-    .where(isNotNull(respondents.submittedAt))
+    .where(countedForAdmin())
     .groupBy(availability.date, availability.status);
 
   const byDate = new Map<string, DayCount>();
@@ -305,7 +325,7 @@ export async function listSubmittedDestinationRankings(): Promise<DestinationSlu
     })
     .from(destinationVotes)
     .innerJoin(respondents, eq(destinationVotes.respondentId, respondents.id))
-    .where(isNotNull(respondents.submittedAt))
+    .where(countedForAdmin())
     .orderBy(destinationVotes.respondentId, destinationVotes.rank);
 
   const byRespondent = new Map<string, DestinationSlug[]>();
@@ -335,7 +355,7 @@ export async function listSubmittedRespondentsWithTopChoice(): Promise<
         eq(destinationVotes.rank, 1),
       ),
     )
-    .where(isNotNull(respondents.submittedAt))
+    .where(countedForAdmin())
     .orderBy(respondents.createdAt);
 
   return rows.map((row) => ({ respondent: row.respondent, topChoice: row.topChoice }));
