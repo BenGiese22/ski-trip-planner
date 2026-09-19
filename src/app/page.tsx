@@ -11,7 +11,7 @@ import { Section } from "@/components/Section";
 import { SourceLine } from "@/components/SourceLine";
 import { WelcomeBack } from "@/components/WelcomeBack";
 import { passInfo, passSources } from "@/data/passInfo";
-import { currentRespondent, loadClientResponse } from "@/lib/serverSession";
+import { loadInitialResponse } from "@/lib/serverSession";
 
 /**
  * There's no /me route (section 16, decision 1). This page reads the identity
@@ -23,13 +23,18 @@ import { currentRespondent, loadClientResponse } from "@/lib/serverSession";
  * to keep a static prerender that saves nothing measurable for a dozen guests.
  */
 export default async function Home() {
-  const respondent = await currentRespondent();
-  const response = respondent ? await loadClientResponse(respondent) : null;
+  const { response, failed } = await loadInitialResponse();
 
   return (
     <ResponseProvider initialResponse={response}>
       <Hero />
       <main className="w-full min-w-0 max-w-[980px] mx-auto px-6 py-14">
+        {failed && (
+          <p className="text-sm text-ink border border-rust bg-[#F6DAD6] rounded-lg p-4 max-w-[60ch] mb-8">
+            Couldn&rsquo;t load your saved answers just now — the database
+            didn&rsquo;t answer. Nothing is lost; try reloading in a moment.
+          </p>
+        )}
         <Section
           id="you"
           number="01"
