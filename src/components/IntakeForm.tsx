@@ -62,6 +62,17 @@ export function IntakeForm() {
     // save to yet — decision 7 defers row creation until intake is complete.
     if (!started) return;
     const parsed = parseDraft({ ...draft, [key]: value });
+    if (parsed.success) {
+      update(parsed.data, { immediate: key !== "name" && key !== "email" });
+    }
+  }
+
+  // Free-text fields debounce through the normal autosave queue instead of
+  // firing a PATCH per keystroke; this flushes whatever's pending the moment
+  // the person leaves the field.
+  function flushField() {
+    if (!started) return;
+    const parsed = parseDraft(draft);
     if (parsed.success) update(parsed.data, { immediate: true });
   }
 
@@ -105,6 +116,7 @@ export function IntakeForm() {
             aria-invalid={Boolean(errors.name)}
             aria-describedby={describedBy("name")}
             onChange={(e) => set("name", e.target.value)}
+            onBlur={flushField}
           />
           <FieldError id={`${ids}-name-error`} message={errors.name} />
         </div>
@@ -122,6 +134,7 @@ export function IntakeForm() {
             aria-invalid={Boolean(errors.email)}
             aria-describedby={describedBy("email")}
             onChange={(e) => set("email", e.target.value)}
+            onBlur={flushField}
           />
           <FieldError id={`${ids}-email-error`} message={errors.email} />
         </div>
