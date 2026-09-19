@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ResponseProvider, useResponse } from "./ResponseProvider";
 import { WelcomeBack } from "./WelcomeBack";
-import type { ClientResponse } from "@/lib/serverSession";
+import type { ClientDecline, ClientResponse } from "@/lib/serverSession";
 
 function response(overrides: Partial<ClientResponse> = {}): ClientResponse {
   return {
@@ -25,9 +25,9 @@ function response(overrides: Partial<ClientResponse> = {}): ClientResponse {
   };
 }
 
-const renderWith = (value: ClientResponse | null) =>
+const renderWith = (value: ClientResponse | null, decline: ClientDecline | null = null) =>
   render(
-    <ResponseProvider initialResponse={value} initialDecline={null}>
+    <ResponseProvider initialResponse={value} initialDecline={decline}>
       <WelcomeBack />
     </ResponseProvider>,
   );
@@ -45,6 +45,13 @@ describe("WelcomeBack", () => {
 
   it("renders nothing at all for a first-time visitor", () => {
     const { container } = renderWith(null);
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("renders nothing when a decline is on file", () => {
+    // DeclinedPanel owns that slot — two "we know who you are" cards at once
+    // would contradict each other.
+    const { container } = renderWith(response(), { name: "Jamie Rivera" });
     expect(container).toBeEmptyDOMElement();
   });
 

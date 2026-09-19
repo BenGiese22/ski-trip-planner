@@ -41,7 +41,7 @@ function parseDraft(draft: Draft) {
 }
 
 export function IntakeForm() {
-  const { response, startResponse, update } = useResponse();
+  const { response, decline, reconsidering, startResponse, update } = useResponse();
   const [draft, setDraft] = useState<Draft>(() => draftFrom(response));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -49,6 +49,10 @@ export function IntakeForm() {
   const ids = useId();
 
   const started = response !== null;
+
+  // A guest who bowed out gets `DeclinedPanel` instead, until they say
+  // they've changed their mind.
+  const hidden = decline !== null && !started && !reconsidering;
 
   function set<K extends keyof Draft>(key: K, value: string) {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -94,6 +98,8 @@ export function IntakeForm() {
 
   const describedBy = (field: string) =>
     errors[field] ? `${ids}-${field}-error` : undefined;
+
+  if (hidden) return null;
 
   return (
     <form onSubmit={onSubmit} noValidate>
