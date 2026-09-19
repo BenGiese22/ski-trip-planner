@@ -140,6 +140,7 @@ export function ResponseProvider({
           .json()
           .then((body) => body?.error)
           .catch(() => undefined);
+        setProblems([]);
         return { ok: false, message: message ?? "Couldn't save & finish — try again." };
       }
 
@@ -148,6 +149,7 @@ export function ResponseProvider({
       setProblems([]);
       return { ok: true };
     } catch {
+      setProblems([]);
       return { ok: false, message: "Couldn't save & finish — try again." };
     }
   }, [fields, availability]);
