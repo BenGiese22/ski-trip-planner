@@ -12,10 +12,12 @@ import {
 import { getDb } from "./client";
 import {
   availability,
+  declines,
   destinationVotes,
   rateLimits,
   respondents,
   type AvailabilityRow,
+  type Decline,
   type Respondent,
 } from "./schema";
 
@@ -144,6 +146,68 @@ export async function replaceAvailability(
       await tx.insert(availability).values(entries.map((entry) => ({ respondentId, ...entry })));
     }
   });
+}
+
+export async function findDeclineByToken(token: string): Promise<Decline | null> {
+  const rows = await getDb()
+    .select()
+    .from(declines)
+    .where(eq(declines.cookieToken, token))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * Re-submitting an existing decline edits it in place — matches how
+ * re-posting intake already behaves — rather than 409ing on an
+ * already-declined browser.
+ */
+export async function upsertDecline(
+  input: { name: string | null; email: string | null; reason: string | null },
+  cookieToken: string,
+): Promise<Decline> {
+  const [row] = await getDb()
+    .insert(declines)
+    .values({ ...input, cookieToken })
+    .onConflictDoUpdate({
+      target: declines.cookieToken,
+      set: { name: input.name, email: input.email, reason: input.reason },
+    })
+    .returning();
+  return row;
+}
+
+export async function deleteDeclineByToken(token: string): Promise<boolean> {
+  const rows = await getDb()
+    .delete(declines)
+    .where(eq(declines.cookieToken, token))
+    .returning({ id: declines.id });
+  return rows.length > 0;
+}
+
+/**
+ * Direction-A undo: a decline-only browser completes intake. One
+ * transaction — delete the decline, insert the respondent with a fresh
+ * token — so the two rows can never be observed half-swapped.
+ */
+export async function replaceDeclineWithRespondent(
+  intake: IntakeInput,
+  declineToken: string,
+  newToken: string,
+): Promise<Respondent> {
+  return getDb().transaction(async (tx) => {
+    await tx.delete(declines).where(eq(declines.cookieToken, declineToken));
+    const [row] = await tx
+      .insert(respondents)
+      .values({ ...intake, cookieToken: newToken })
+      .returning();
+    return row;
+  });
+}
+
+export async function countDeclines(): Promise<number> {
+  const [row] = await getDb().select({ count: sql<number>`count(*)::int` }).from(declines);
+  return row?.count ?? 0;
 }
 
 /**
