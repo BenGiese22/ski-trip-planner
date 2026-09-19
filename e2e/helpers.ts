@@ -87,7 +87,10 @@ export async function completeIntake(
     .selectOption({ label: INTAKE.skiLevel });
 
   await page.getByRole("button", { name: /start my response/i }).click();
-  await expect(page.getByRole("heading", { name: /welcome back, jamie/i })).toBeVisible();
+  // Not the welcome-back header: that's suppressed until the next full page
+  // load, so it never appears on the visit that completes intake. The save
+  // bar is the signal that the row now exists — it renders off `response`.
+  await expect(page.getByRole("button", { name: /save & finish/i })).toBeVisible();
 }
 
 /** The grid labels days as "Thursday, January 28 — not set". */

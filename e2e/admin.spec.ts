@@ -218,7 +218,7 @@ test("the cost rollup prices each person and totals the group", async ({
     await p.getByLabel("Home airport").selectOption(g.airport);
     await p.getByLabel("How comfortable are you on snow?").selectOption("intermediate");
     await p.getByRole("button", { name: /start my response/i }).click();
-    await expect(p.getByRole("heading", { name: /welcome back/i })).toBeVisible();
+    await expect(p.getByRole("button", { name: /save & finish/i })).toBeVisible();
 
     await pickDestination(p, g.dest);
     await p.getByRole("button", { name: /Thu Jan 28 – Sun Jan 31/ }).click();
