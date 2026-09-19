@@ -8,6 +8,7 @@ import { IntakeForm } from "@/components/IntakeForm";
 import { ResponseProvider } from "@/components/ResponseProvider";
 import { SaveBar } from "@/components/SaveBar";
 import { Section } from "@/components/Section";
+import { SessionLostNotice } from "@/components/SessionLostNotice";
 import { SourceLine } from "@/components/SourceLine";
 import { WelcomeBack } from "@/components/WelcomeBack";
 import { passInfo, passSources } from "@/data/passInfo";
@@ -35,6 +36,7 @@ export default async function Home() {
             didn&rsquo;t answer. Nothing is lost; try reloading in a moment.
           </p>
         )}
+        <SessionLostNotice />
         <Section
           id="you"
           number="01"

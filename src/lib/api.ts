@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { ZodError } from "zod";
 import { hitRateLimit } from "@/db/queries";
 import { GUEST_WRITE_LIMIT, bucketKey, clientIdFromRequest } from "./rateLimit";
+import { IDENTITY_COOKIE } from "./session";
 
 export function badRequest(error: ZodError): NextResponse {
   return NextResponse.json(
@@ -18,11 +19,19 @@ export function badRequest(error: ZodError): NextResponse {
   );
 }
 
+/**
+ * A cookie whose row is gone (merged/deleted server-side, or just stale)
+ * should stop pointing at nothing — clearing it here means the next load is
+ * a clean first visit instead of a browser stuck retrying a write that can
+ * never land.
+ */
 export function noSuchRespondent(): NextResponse {
-  return NextResponse.json(
+  const response = NextResponse.json(
     { error: "No response found for this browser. Start with the intake form." },
     { status: 404 },
   );
+  response.cookies.delete(IDENTITY_COOKIE);
+  return response;
 }
 
 /**
