@@ -93,6 +93,50 @@ export async function completeIntake(
   await expect(page.getByRole("button", { name: /save & finish/i })).toBeVisible();
 }
 
+export type StoredDecline = {
+  name: string | null;
+  email: string | null;
+  reason: string | null;
+  cookie_token: string;
+};
+
+export function declineRows(): Promise<StoredDecline[]> {
+  return withDb(
+    (sql) => sql<StoredDecline[]>`select name, email, reason, cookie_token from declines`,
+  );
+}
+
+/**
+ * The decline form's own fields — "Your name" labels one in each form, so
+ * they're only distinguishable by the fieldset around them (its legend is
+ * `DECLINE_FORM_LABEL` in CantMakeIt.tsx).
+ */
+export const declineForm = (page: Page) =>
+  page.getByRole("group", { name: "Can't make it" });
+
+/**
+ * Entry point A: expands the "can't make it" disclosure and submits it. The
+ * submit button's name is a substring of the disclosure link's, so it's
+ * matched exactly rather than by regex.
+ */
+export async function declineAsFirstTimer(
+  page: Page,
+  { name, email, reason }: { name: string; email?: string; reason?: string },
+) {
+  await page.getByRole("button", { name: /can.t make it this time/i }).click();
+
+  const form = declineForm(page);
+  await form.getByLabel("Your name").fill(name);
+  if (email !== undefined) await form.getByLabel("Email (optional)").fill(email);
+  if (reason !== undefined) {
+    await form.getByLabel(/anything you want ben to know/i).fill(reason);
+  }
+  await form.getByRole("button", { name: "Let Ben know", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: /thanks for letting ben know/i }),
+  ).toBeVisible();
+}
+
 /** The grid labels days as "Thursday, January 28 — not set". */
 export function dayCell(page: Page, label: string) {
   return page.getByRole("button", { name: new RegExp(`^${label} —`) });

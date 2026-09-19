@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { TEST_ADMIN_PASSCODE, databaseUrl, truncateAll } from "./database";
-import { completeIntake, pickDestination } from "./helpers";
+import { completeIntake, declineAsFirstTimer, declineForm, pickDestination } from "./helpers";
 
 test.beforeEach(async () => {
   await truncateAll(databaseUrl);
@@ -27,6 +27,29 @@ test("the started page, with grid and toggles, has none either", async ({ page }
   await page.goto("/");
   await completeIntake(page, { plusOne: true });
   await pickDestination(page, "steamboat");
+
+  const results = await scan(page);
+  expect(results.violations).toEqual([]);
+});
+
+// Neither of the decline states is reachable from the scans above: the form
+// is behind a disclosure, and the declined page replaces section 01 entirely.
+test("the expanded decline form has no detectable accessibility violations", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByLabel("Your name").waitFor();
+  await page.getByRole("button", { name: /can.t make it this time/i }).click();
+  await declineForm(page).getByLabel("Email (optional)").waitFor();
+
+  const results = await scan(page);
+  expect(results.violations).toEqual([]);
+});
+
+test("the declined page state has none either", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("Your name").waitFor();
+  await declineAsFirstTimer(page, { name: "Jamie Rivera", reason: "Away that weekend" });
 
   const results = await scan(page);
   expect(results.violations).toEqual([]);
