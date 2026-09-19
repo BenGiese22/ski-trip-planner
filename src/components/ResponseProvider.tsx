@@ -23,6 +23,12 @@ type ResponseContextValue = {
   problems: FinishProblem[];
   /** True once a write has come back 404 — the identity cookie points at a row that's gone. */
   sessionLost: boolean;
+  /**
+   * True from the moment intake creates the row until the next full page
+   * load. Distinguishes "just started" from "returning after a previous
+   * visit" — both are `response !== null`, but only the second is a return.
+   */
+  justCreated: boolean;
   /** Creates the row. Only call once intake is complete — see decision 7. */
   startResponse: (intake: IntakeInput) => Promise<{ ok: boolean; message?: string }>;
   /** Debounced autosave. Pass immediate for selects, toggles and blur. */
@@ -84,6 +90,12 @@ export function ResponseProvider({
   const [response, setResponse] = useState<ClientResponse | null>(initialResponse);
   const [problems, setProblems] = useState<FinishProblem[]>([]);
   const [sessionLost, setSessionLost] = useState(false);
+  const [justCreated, setJustCreated] = useState(false);
+  // "Save & finish" doesn't run through the autosave hooks, so its own
+  // success needs its own timestamp — otherwise clicking "Update my answer"
+  // with nothing changed looks like it did nothing, since lastSavedAt below
+  // would still show whenever the last real autosave happened instead.
+  const [finishedAt, setFinishedAt] = useState<number | null>(null);
 
   // The row is confirmed gone (stale cookie, merged/deleted server-side) —
   // starting fresh is the right next step here, not a risky one, so this
@@ -134,6 +146,7 @@ export function ResponseProvider({
     try {
       const { response: created } = await postJson("/api/respondents", intake);
       setResponse(created);
+      setJustCreated(true);
       return { ok: true };
     } catch (err) {
       return {
@@ -203,6 +216,7 @@ export function ResponseProvider({
       const body = await res.json();
       setResponse(body.response);
       setProblems([]);
+      setFinishedAt(Date.now());
       return { ok: true };
     } catch {
       setProblems([]);
@@ -224,9 +238,11 @@ export function ResponseProvider({
     () => ({
       response,
       status,
-      lastSavedAt: Math.max(fields.lastSavedAt ?? 0, availability.lastSavedAt ?? 0) || null,
+      lastSavedAt:
+        Math.max(fields.lastSavedAt ?? 0, availability.lastSavedAt ?? 0, finishedAt ?? 0) || null,
       problems,
       sessionLost,
+      justCreated,
       startResponse,
       update,
       setAvailability,
@@ -237,8 +253,10 @@ export function ResponseProvider({
       status,
       fields.lastSavedAt,
       availability.lastSavedAt,
+      finishedAt,
       problems,
       sessionLost,
+      justCreated,
       startResponse,
       update,
       setAvailability,
