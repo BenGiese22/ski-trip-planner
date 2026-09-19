@@ -49,7 +49,6 @@ export function CostSection() {
           version is also available (confirmed pricing:{" "}
           {formatUsd(costAssumptions.ikonSessionPassByDays[3].standard)},
           student {formatUsd(costAssumptions.ikonSessionPassByDays[3].student)}).
-          There&rsquo;s no 1-day tier — see the standalone lift ticket note above.
         </p>
       </div>
       <p className="text-xs text-ink-soft mb-4.5">

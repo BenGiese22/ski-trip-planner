@@ -86,8 +86,8 @@ export function DestinationRanker() {
         {!started
           ? "Answer the questions up top and you can rank these in the order you'd prefer."
           : ranked
-            ? "Drag to reorder, or use the arrows. Your first choice drives the cost estimate further down."
-            : "Put these in the order you'd prefer — drag them, or use the arrows. Nothing is decided by this; it just shows Ben where the group leans."}
+            ? "Use the arrows to reorder — drag works too if you're on a computer. Your first choice drives the cost estimate further down."
+            : "Put these in the order you'd prefer using the arrows — drag works too if you're on a computer. Nothing is decided by this; it just shows Ben where the group leans."}
       </p>
 
       <ol className="flex flex-col gap-3.5 list-none p-0 min-w-0">
