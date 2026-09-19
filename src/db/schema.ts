@@ -98,7 +98,31 @@ export const rateLimits = pgTable(
   (table) => [primaryKey({ columns: [table.bucketKey, table.windowStart] })],
 );
 
+/**
+ * One row per browser that has said "I can't make it". Kept apart from
+ * `respondents` because that table's intake columns are NOT NULL by design
+ * (nothing is written until intake is complete) and a decline has no
+ * airport or ski level to give. The same cookie token may appear in both
+ * tables at once — someone can finish a response and later bow out — and
+ * when it does, the decline wins everywhere on /admin (PLAN.md §19).
+ *
+ * Deliberately no foreign key to respondents, like rate_limits: a decline
+ * has to work for a browser with no respondent row, which is the common
+ * case. name/email are nullable because they're populated two ways — from
+ * the form for a first-time visitor, or copied from the respondent row
+ * server-side — not because either path ever leaves them empty.
+ */
+export const declines = pgTable("declines", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  cookieToken: uuid("cookie_token").notNull().unique(),
+  name: text("name"),
+  email: text("email"),
+  reason: text("reason"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export type Respondent = typeof respondents.$inferSelect;
 export type NewRespondent = typeof respondents.$inferInsert;
 export type AvailabilityRow = typeof availability.$inferSelect;
 export type DestinationVote = typeof destinationVotes.$inferSelect;
+export type Decline = typeof declines.$inferSelect;
