@@ -77,3 +77,22 @@ export async function loadClientResponse(
     availabilityRows.map((row) => ({ date: row.date, status: row.status })),
   );
 }
+
+/**
+ * Resolves the identity cookie to a saved response for `/`, folding a
+ * database outage into `failed` rather than letting it escape — either
+ * `currentRespondent` or `loadClientResponse` can throw when Postgres is
+ * unreachable, and both mean the same thing to the caller.
+ */
+export async function loadInitialResponse(): Promise<{
+  response: ClientResponse | null;
+  failed: boolean;
+}> {
+  try {
+    const respondent = await currentRespondent();
+    const response = respondent ? await loadClientResponse(respondent) : null;
+    return { response, failed: false };
+  } catch {
+    return { response: null, failed: true };
+  }
+}
