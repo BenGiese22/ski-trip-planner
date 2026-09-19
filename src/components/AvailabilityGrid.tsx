@@ -151,7 +151,7 @@ export function AvailabilityGrid() {
       </p>
 
       <div
-        className="grid grid-cols-1 sm:grid-cols-3 gap-4 select-none"
+        className="grid grid-cols-1 lg:grid-cols-3 gap-4 select-none"
         // Painting is driven by pointer events on the cells; suppressing the
         // browser's own drag/scroll gesture keeps a drag from turning into a
         // text selection or a page scroll mid-paint.
