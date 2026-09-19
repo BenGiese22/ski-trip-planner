@@ -11,7 +11,7 @@ import {
 import type { AvailabilityStatus } from "@/db/schema";
 import type { FinishProblem } from "@/lib/finish";
 import type { IntakeInput, RespondentPatch } from "@/lib/schemas";
-import type { ClientResponse } from "@/lib/serverSession";
+import type { ClientDecline, ClientResponse } from "@/lib/serverSession";
 import { useAutosave, type SaveStatus } from "@/hooks/useAutosave";
 
 export type AvailabilityEntry = { date: string; status: AvailabilityStatus };
@@ -82,12 +82,15 @@ async function postJson(url: string, body: unknown, method = "POST") {
 
 export function ResponseProvider({
   initialResponse,
+  initialDecline,
   children,
 }: {
   initialResponse: ClientResponse | null;
+  initialDecline: ClientDecline | null;
   children: ReactNode;
 }) {
   const [response, setResponse] = useState<ClientResponse | null>(initialResponse);
+  const [decline, setDecline] = useState<ClientDecline | null>(initialDecline);
   const [problems, setProblems] = useState<FinishProblem[]>([]);
   const [sessionLost, setSessionLost] = useState(false);
   const [justCreated, setJustCreated] = useState(false);

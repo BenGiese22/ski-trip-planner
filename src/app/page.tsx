@@ -24,10 +24,10 @@ import { loadInitialResponse } from "@/lib/serverSession";
  * to keep a static prerender that saves nothing measurable for a dozen guests.
  */
 export default async function Home() {
-  const { response, failed } = await loadInitialResponse();
+  const { response, decline, failed } = await loadInitialResponse();
 
   return (
-    <ResponseProvider initialResponse={response}>
+    <ResponseProvider initialResponse={response} initialDecline={decline}>
       <Hero />
       <main className="w-full min-w-0 max-w-[980px] mx-auto px-6 py-14">
         {failed && (
