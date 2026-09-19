@@ -12,6 +12,10 @@ const scan = (page: Page) =>
 
 test("the first-visit page has no detectable accessibility violations", async ({ page }) => {
   await page.goto("/");
+  // Wait past the loading.tsx streaming fallback (Hero + a loading
+  // paragraph, no form) to the real first-visit page before scanning.
+  await page.getByLabel("Your name").waitFor();
+
   const results = await scan(page);
   expect(results.violations).toEqual([]);
 });
@@ -43,6 +47,10 @@ test("the admin passcode gate has no detectable accessibility violations", async
   page,
 }) => {
   await page.goto("/admin");
+  // Wait past admin/loading.tsx's streaming fallback (no form) to the real
+  // passcode gate before scanning.
+  await page.getByLabel("Passcode").waitFor();
+
   const results = await scan(page);
   expect(results.violations).toEqual([]);
 });
