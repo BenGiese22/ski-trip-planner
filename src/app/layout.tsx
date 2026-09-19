@@ -20,9 +20,14 @@ const plexMono = IBM_Plex_Mono({
   subsets: ["latin"],
 });
 
+const title = "Colorado ski trip planner";
+const description = "Trip interest and scheduling check for a Colorado ski weekend.";
+
 export const metadata: Metadata = {
-  title: "Colorado ski trip planner",
-  description: "Trip interest and scheduling check for a Colorado ski weekend.",
+  metadataBase: new URL("https://ski-trip-planner-six.vercel.app"),
+  title,
+  description,
+  openGraph: { title, description },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
