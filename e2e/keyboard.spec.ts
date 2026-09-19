@@ -18,6 +18,10 @@ test("every link on the first-visit page is keyboard-reachable with a visible fo
 }) => {
   await page.goto("/");
 
+  // Wait past the loading.tsx streaming fallback (Hero + a loading
+  // paragraph, no links) to the real first-visit page before counting.
+  await page.getByLabel("Your name").waitFor();
+
   const linkCount = await page.getByRole("link").count();
   expect(linkCount).toBeGreaterThan(0);
 
