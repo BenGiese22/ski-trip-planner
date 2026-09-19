@@ -106,6 +106,17 @@ export function declineRows(): Promise<StoredDecline[]> {
   );
 }
 
+/** The respondent row's identity columns — used to prove a decline undo reuses the row rather than recreating it. */
+export function respondentIdentity(): Promise<{ cookie_token: string; created_at: Date }> {
+  return withDb(async (sql) => {
+    const rows = await sql<
+      { cookie_token: string; created_at: Date }[]
+    >`select cookie_token, created_at from respondents`;
+    expect(rows).toHaveLength(1);
+    return rows[0];
+  });
+}
+
 /**
  * The decline form's own fields — "Your name" labels one in each form, so
  * they're only distinguishable by the fieldset around them (its legend is
@@ -128,6 +139,24 @@ export async function declineAsFirstTimer(
   const form = declineForm(page);
   await form.getByLabel("Your name").fill(name);
   if (email !== undefined) await form.getByLabel("Email (optional)").fill(email);
+  if (reason !== undefined) {
+    await form.getByLabel(/anything you want ben to know/i).fill(reason);
+  }
+  await form.getByRole("button", { name: "Let Ben know", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: /thanks for letting ben know/i }),
+  ).toBeVisible();
+}
+
+/**
+ * Entry point B: a respondent row already exists, so this only asks for a
+ * reason. Same fieldset legend as entry point A — the two forms never render
+ * at once, so `declineForm` still scopes to the right one.
+ */
+export async function declineAfterStarting(page: Page, { reason }: { reason?: string } = {}) {
+  await page.getByRole("button", { name: /can.t make it after all/i }).click();
+
+  const form = declineForm(page);
   if (reason !== undefined) {
     await form.getByLabel(/anything you want ben to know/i).fill(reason);
   }

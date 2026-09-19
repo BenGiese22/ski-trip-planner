@@ -2,17 +2,39 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CantMakeIt } from "./CantMakeIt";
 import { ResponseProvider } from "./ResponseProvider";
-import type { ClientDecline } from "@/lib/serverSession";
+import type { ClientDecline, ClientResponse } from "@/lib/serverSession";
 
-function renderWith(decline: ClientDecline | null = null) {
+function response(overrides: Partial<ClientResponse> = {}): ClientResponse {
+  return {
+    name: "Jamie Rivera",
+    email: "jamie@example.com",
+    plusOne: false,
+    homeAirport: "SFO",
+    skiLevel: "intermediate",
+    skiDays: null,
+    alreadyHasPass: false,
+    gearStatus: null,
+    plusOneSkiDays: null,
+    plusOneAlreadyHasPass: false,
+    plusOneGearStatus: null,
+    notes: null,
+    submittedAt: null,
+    destinationRanking: [],
+    availability: [],
+    ...overrides,
+  };
+}
+
+function renderWith(decline: ClientDecline | null = null, current: ClientResponse | null = null) {
   return render(
-    <ResponseProvider initialResponse={null} initialDecline={decline}>
+    <ResponseProvider initialResponse={current} initialDecline={decline}>
       <CantMakeIt />
     </ResponseProvider>,
   );
 }
 
 const trigger = () => screen.getByRole("button", { name: /can.t make it this time/i });
+const triggerB = () => screen.getByRole("button", { name: /can.t make it after all/i });
 
 function expand() {
   fireEvent.click(trigger());
@@ -128,6 +150,41 @@ describe("CantMakeIt", () => {
 
   it("renders nothing once a decline is already on file", () => {
     const { container } = renderWith({ name: "Jamie Rivera" });
+    expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe("CantMakeIt — entry point B, a respondent row already exists", () => {
+  it("offers only a reason field, no name or email", () => {
+    renderWith(null, response());
+    fireEvent.click(triggerB());
+
+    expect(screen.queryByLabelText("Your name")).toBeNull();
+    expect(screen.queryByLabelText("Email (optional)")).toBeNull();
+    expect(screen.getByLabelText(/anything you want ben to know/i)).toBeVisible();
+    expect(screen.getByText(/ben already has your name and email/i)).toBeVisible();
+  });
+
+  it("posts only the reason, via declineReasonSchema's shape", async () => {
+    const fetchMock = stubFetch();
+    renderWith(null, response());
+    fireEvent.click(triggerB());
+
+    fireEvent.change(screen.getByLabelText(/anything you want ben to know/i), {
+      target: { value: "Away that weekend" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Let Ben know" }));
+
+    await waitFor(() => expect(screen.queryByRole("button", { name: /let ben know/i })).toBeNull());
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/declines");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body)).toEqual({ reason: "Away that weekend" });
+  });
+
+  it("renders nothing once a decline is already on file", () => {
+    const { container } = renderWith({ name: "Jamie Rivera" }, response());
     expect(container).toBeEmptyDOMElement();
   });
 });

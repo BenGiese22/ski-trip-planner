@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState, type FormEvent } from "react";
-import { DECLINE_REASON_MAX, declineSchema } from "@/lib/schemas";
+import { DECLINE_REASON_MAX, declineReasonSchema, declineSchema } from "@/lib/schemas";
 import { FieldError, fieldClasses, labelClasses } from "./formPrimitives";
 import { useResponse } from "./ResponseProvider";
 
@@ -28,15 +28,17 @@ const primaryButtonClasses =
 const quietButtonClasses = `text-sm text-ink-soft hover:text-ink px-2 py-2.5 ${focusRing}`;
 
 /**
- * Entry point A: a guest who hasn't started a response says they can't come.
- * Hidden once a decline is on file — `DeclinedPanel` owns that slot.
+ * Lets a guest bow out — entry point A if they haven't started a response
+ * yet (collects name/email/reason), entry point B if they have (name and
+ * email are already on file, so only the reason is asked). Hidden once a
+ * decline is on file — `DeclinedPanel` owns that slot.
  */
 export function CantMakeIt() {
   const { response, decline } = useResponse();
   const [expanded, setExpanded] = useState(false);
   const panelId = useId();
 
-  if (decline || response) return null;
+  if (decline) return null;
 
   return (
     <div className="mt-4">
@@ -47,12 +49,18 @@ export function CantMakeIt() {
         onClick={() => setExpanded((open) => !open)}
         className={triggerClasses}
       >
-        Can&rsquo;t make it this time? Let Ben know
+        {response
+          ? "Can’t make it after all? Let Ben know"
+          : "Can’t make it this time? Let Ben know"}
       </button>
 
       {expanded && (
         <div id={panelId} className="mt-3">
-          <DeclineForm onCancel={() => setExpanded(false)} />
+          {response ? (
+            <DeclineReasonForm onCancel={() => setExpanded(false)} />
+          ) : (
+            <DeclineForm onCancel={() => setExpanded(false)} />
+          )}
         </div>
       )}
     </div>
@@ -168,6 +176,92 @@ function DeclineForm({ onCancel }: { onCancel: () => void }) {
             {draft.reason.length}/{DECLINE_REASON_MAX}
           </p>
           <FieldError id={`${ids}-reason-error`} message={errors.reason} />
+        </div>
+
+        <div className="mt-4 flex items-center gap-2 flex-wrap">
+          <button type="submit" disabled={submitting} className={primaryButtonClasses}>
+            {submitting ? "Saving…" : "Let Ben know"}
+          </button>
+          <button type="button" onClick={onCancel} className={quietButtonClasses}>
+            Never mind
+          </button>
+        </div>
+      </fieldset>
+
+      {formError && (
+        <p role="alert" className="text-sm text-rust mt-3">
+          {formError}
+        </p>
+      )}
+    </form>
+  );
+}
+
+/**
+ * Entry point B: a respondent row already knows the guest's name and email,
+ * so bowing out only asks for a reason.
+ */
+function DeclineReasonForm({ onCancel }: { onCancel: () => void }) {
+  const { declineTrip } = useResponse();
+  const [reason, setReason] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const ids = useId();
+
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault();
+    const parsed = declineReasonSchema.safeParse(reason.trim() ? { reason } : {});
+
+    if (!parsed.success) {
+      setErrors(
+        Object.fromEntries(
+          parsed.error.issues.map((issue) => [issue.path.join("."), issue.message]),
+        ),
+      );
+      return;
+    }
+
+    setErrors({});
+    setSubmitting(true);
+    setFormError(null);
+    const result = await declineTrip(parsed.data);
+    setSubmitting(false);
+    if (!result.ok) setFormError(result.message ?? "Something went wrong.");
+  }
+
+  const describedBy = (field: string) =>
+    errors[field] ? `${ids}-${field}-error` : undefined;
+
+  return (
+    <form onSubmit={onSubmit} noValidate>
+      <fieldset>
+        <legend className="sr-only">{DECLINE_FORM_LABEL}</legend>
+
+        <div>
+          <label className={labelClasses} htmlFor={`${ids}-reason`}>
+            Anything you want Ben to know? (optional)
+          </label>
+          <textarea
+            id={`${ids}-reason`}
+            className={fieldClasses}
+            rows={3}
+            maxLength={DECLINE_REASON_MAX}
+            value={reason}
+            aria-invalid={Boolean(errors.reason)}
+            aria-describedby={[`${ids}-reason-count`, describedBy("reason")]
+              .filter(Boolean)
+              .join(" ")}
+            onChange={(e) => setReason(e.target.value)}
+          />
+          <p id={`${ids}-reason-count`} className="text-xs text-ink-soft mt-1">
+            {reason.length}/{DECLINE_REASON_MAX}
+          </p>
+          <FieldError id={`${ids}-reason-error`} message={errors.reason} />
+          <p className="text-xs text-ink-soft mt-1.5">
+            Ben already has your name and email. Everything you&rsquo;ve
+            filled in stays put — you can change your mind any time.
+          </p>
         </div>
 
         <div className="mt-4 flex items-center gap-2 flex-wrap">

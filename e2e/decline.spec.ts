@@ -2,9 +2,13 @@ import { expect, test } from "@playwright/test";
 import { databaseUrl, truncateAll } from "./database";
 import {
   completeIntake,
+  declineAfterStarting,
   declineAsFirstTimer,
   declineRows,
+  INTAKE,
+  onlyRespondent,
   respondentCount,
+  respondentIdentity,
 } from "./helpers";
 
 test.beforeEach(async () => {
@@ -112,4 +116,57 @@ test("an over-long reason is rejected by the API", async ({ request }) => {
   });
   expect(response.status()).toBe(400);
   expect(await declineRows()).toEqual([]);
+});
+
+test("a started guest can bow out without losing their response", async ({ page }) => {
+  await page.goto("/");
+  await completeIntake(page);
+  await declineAfterStarting(page);
+
+  await expect(
+    page.getByRole("heading", { name: /thanks for letting ben know, jamie\./i }),
+  ).toBeVisible();
+
+  const rows = await declineRows();
+  expect(rows).toHaveLength(1);
+  expect(rows[0]).toMatchObject({
+    name: INTAKE.name,
+    email: INTAKE.email,
+    reason: null,
+  });
+
+  expect(await respondentCount()).toBe(1);
+  const respondent = await onlyRespondent();
+  expect(respondent.name).toBe(INTAKE.name);
+  expect(respondent.email).toBe(INTAKE.email);
+
+  // No FK between the two tables — the shared cookie_token is what ties them.
+  const { cookie_token } = await respondentIdentity();
+  expect(rows[0].cookie_token).toBe(cookie_token);
+});
+
+test("undoing a both-rows decline restores welcome back, not a new row", async ({ page }) => {
+  await page.goto("/");
+  await completeIntake(page);
+  await declineAfterStarting(page);
+  const { created_at: createdBefore } = await respondentIdentity();
+
+  await page.getByRole("button", { name: /actually, i can make it/i }).click();
+  // `justCreated` is still true from `completeIntake` earlier in this same
+  // visit, so `WelcomeBack` stays suppressed until the next full page load —
+  // same as every other "reconsider" path in this suite.
+  await expect(
+    page.getByRole("heading", { name: /thanks for letting ben know/i }),
+  ).toBeHidden();
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: /welcome back, jamie/i })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: /thanks for letting ben know/i }),
+  ).toBeHidden();
+
+  expect(await declineRows()).toEqual([]);
+  // Proves the row was reused, not recreated, by the undo.
+  const { created_at: createdAfter } = await respondentIdentity();
+  expect(createdAfter).toEqual(createdBefore);
 });
