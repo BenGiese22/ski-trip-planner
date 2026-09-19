@@ -26,6 +26,9 @@ test.describe("mobile-only layout checks", () => {
     // state; these are the other states a phone-width layout can still break in.
     test("first visit, before any intake", async ({ page }) => {
       await page.goto("/");
+      // Wait past the loading.tsx streaming fallback (Hero + a loading
+      // paragraph, no form) to the real first-visit page before measuring.
+      await page.getByLabel("Your name").waitFor();
       await expectNoSidewaysScroll(page);
     });
 
