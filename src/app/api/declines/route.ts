@@ -61,10 +61,12 @@ export async function POST(request: Request) {
     reason: parsed.data.reason ?? null,
   };
 
-  const existing = token ? await findDeclineByToken(token) : null;
-  if (existing) {
-    const decline = await upsertDecline(payload, token as string);
-    return NextResponse.json({ decline: toClientDecline(decline) });
+  if (token) {
+    const existing = await findDeclineByToken(token);
+    if (existing) {
+      const decline = await upsertDecline(payload, token);
+      return NextResponse.json({ decline: toClientDecline(decline) });
+    }
   }
 
   const newToken = createCookieToken();
