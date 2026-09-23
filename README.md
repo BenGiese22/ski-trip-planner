@@ -43,5 +43,6 @@ bar each phase needs to clear. The tests need no env vars or production access.
 **before** merging the code that depends on it, since `main` deploys
 immediately. Use `npm run db:push` (it targets production unless
 `DATABASE_URL` is set) or paste the `drizzle/NNNN_*.sql` file into Supabase's
-SQL editor. `PLAN.md` section 12, "Applying schema changes", has the details
-and a known gap in the migration files.
+SQL editor. Commit a `drizzle-kit generate` migration for every schema change:
+the e2e suite builds its database from those files, so a missing one fails CI.
+`PLAN.md` section 12, "Applying schema changes", has the details.
