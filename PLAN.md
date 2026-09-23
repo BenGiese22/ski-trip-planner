@@ -362,7 +362,9 @@ vercel env pull .env.local --environment=development   # then re-add the two adm
 node --env-file=.env.local ./node_modules/drizzle-kit/bin.cjs push
 ```
 
-…or paste the new `drizzle/NNNN_*.sql` into Supabase's SQL editor. A table created in the SQL editor gets no row-level security. The app connects as the `postgres` role, which bypasses RLS, so `ALTER TABLE <t> ENABLE ROW LEVEL SECURITY;` costs nothing. Without it, if Supabase's Data API is on, the table is readable with the public anon key.
+…or paste the new `drizzle/NNNN_*.sql` into Supabase's SQL editor.
+
+**Row-level security.** Supabase's Data API is **on** for this project, and it serves every `public` table over REST to the anon key, which is public by design. RLS is the only gate. Every table therefore declares `.enableRLS()` in `schema.ts`, with no policies. The app connects as `postgres`, which owns the tables and has `BYPASSRLS`, so it is unaffected. A new table needs `.enableRLS()` as well; `e2e/schema.spec.ts` fails without it. RLS was off on every table until 2026-09-23, when `0003_enable_rls.sql` was applied to production. A rolled-back probe confirmed that `postgres` still reads the tables and `anon` sees nothing.
 
 **Tests.** `e2e/global-setup.ts` starts a throwaway `postgres:16` container (`ski-trip-e2e-pg`, port 54329), unless `DATABASE_URL` points elsewhere. It builds the schema by replaying `drizzle/*.sql` through drizzle's migrator, not by pushing `schema.ts`, so a missing or wrong migration file fails the suite the same way it would break a fresh database.
 
@@ -678,7 +680,7 @@ every response was a yes:
    lives in section 12, "Applying schema changes". Checked against production
    on 2026-09-23: `declines` exists and matches `schema.ts`. That check also
    found RLS off on all five tables, with the `anon` role able to `SELECT`
-   from each.]*
+   from each; fixed the same day (section 12, "Row-level security").]*
 
 9. **Known limit of cookie identity (recorded after review).** A guest who
    declines in one browser and later responds from another device leaves an
