@@ -54,6 +54,10 @@ to production.
 - `npm run dev` — local dev server
 - `npm run check` — lint + typecheck + unit tests + e2e tests (the full gate)
 - `npm run lint` / `npm run typecheck` / `npm run test:unit` / `npm run test:e2e`
+- `npm run db:push` — push `src/db/schema.ts` to **production** Supabase
+  (unless `DATABASE_URL` is set). Run it *before* merging code that needs the
+  change, because `main` deploys immediately — see PLAN.md section 12,
+  "Applying schema changes".
 
 <!-- BEGIN:nextjs-agent-rules -->
 
