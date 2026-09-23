@@ -12,6 +12,12 @@ import { sql } from "drizzle-orm";
 import type { AirportCode, DestinationSlug } from "@/data/types";
 import type { GearStatus, SkiDays } from "@/lib/costs";
 
+// Every table gets .enableRLS() with no policies. Supabase's Data API exposes
+// `public` tables over REST to the anon key, which is public by design, so RLS
+// is the only thing keeping guest names and emails off it. The app connects
+// as `postgres`, the table owner, which bypasses RLS — so it's unaffected.
+// e2e/schema.spec.ts fails if a table is added without it.
+
 export type SkiLevel = "beginner" | "intermediate" | "advanced";
 export type AvailabilityStatus = "available" | "maybe" | "unavailable";
 
@@ -47,7 +53,7 @@ export const respondents = pgTable("respondents", {
   submittedAt: timestamp("submitted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}).enableRLS();
 
 // One row per (respondent, date). Per-day rows rather than a range because
 // real availability is often non-contiguous (section 7).
@@ -61,7 +67,7 @@ export const availability = pgTable(
     status: text("status").$type<AvailabilityStatus>().notNull(),
   },
   (table) => [primaryKey({ columns: [table.respondentId, table.date] })],
-);
+).enableRLS();
 
 // Phase 2 writes exactly one row per respondent at rank 1 — the single
 // destination select from section 16, decision 3. The table keeps the ranked
@@ -76,7 +82,7 @@ export const destinationVotes = pgTable(
     rank: integer("rank").notNull(),
   },
   (table) => [primaryKey({ columns: [table.respondentId, table.destinationSlug] })],
-);
+).enableRLS();
 
 /**
  * Fixed-window rate limiting (PLAN.md §17 decision 8). One row per
@@ -96,7 +102,7 @@ export const rateLimits = pgTable(
     count: integer("count").notNull().default(0),
   },
   (table) => [primaryKey({ columns: [table.bucketKey, table.windowStart] })],
-);
+).enableRLS();
 
 /**
  * One row per browser that has said "I can't make it". Kept apart from
@@ -119,7 +125,7 @@ export const declines = pgTable("declines", {
   email: text("email"),
   reason: text("reason"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}).enableRLS();
 
 export type Respondent = typeof respondents.$inferSelect;
 export type NewRespondent = typeof respondents.$inferInsert;
