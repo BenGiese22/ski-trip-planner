@@ -91,9 +91,10 @@ create table respondents (
   id            uuid primary key default gen_random_uuid(),
   cookie_token  uuid not null unique,        -- matches the httpOnly cookie, see section 6
   name          text not null,
+  email         text not null,               -- added in Phase 2, section 16 decision 8
   plus_one      boolean not null default false,
-  home_airport  text,                        -- 'SFO' | 'ORD' | 'MKE' | 'MSP'
-  ski_level     text,                        -- 'beginner' | 'intermediate' | 'advanced'
+  home_airport  text not null,               -- 'SFO' | 'ORD' | 'MKE' | 'MSP'
+  ski_level     text not null,               -- 'beginner' | 'intermediate' | 'advanced'
   ski_days      int,                         -- 1, 2, or 3 — null if "already have a pass"
   already_has_pass boolean not null default false,
   gear_status   text,                        -- 'own' | 'rental'
@@ -132,7 +133,18 @@ create table declines (
   reason        text,
   created_at    timestamptz not null default now()
 );
+
+-- fixed-window rate limiter for the guest write endpoints and admin login
+-- (Phase 3); no foreign key, so it works for callers with no respondent row
+create table rate_limits (
+  bucket_key    text not null,
+  window_start  timestamptz not null,
+  count         int not null default 0,
+  primary key (bucket_key, window_start)
+);
 ```
+
+**[Update, post-decline]:** `src/db/schema.ts` is the authoritative schema; the block above mirrors it as of the decline feature (section 19). `home_airport` and `ski_level` are `NOT NULL` because no row exists until intake is complete (section 16, decision 7). See section 12, "Applying schema changes", for how a change here reaches production.
 
 Destinations, cost assumptions, and Ikon pass facts can stay as static structured data in the codebase (section 2) rather than DB tables — they change once a season, not per user, and keeping them in version control makes it obvious when they were last checked.
 
@@ -257,11 +269,38 @@ Render these as small "source" links under the relevant card/section in the UI (
 
 For a group this small, a single-page scroll with anchored sections (like the mockups) is honestly fine too and reduces navigation complexity — the route split above is only worth it if the content grows enough that a wizard flow feels better than scrolling. Worth deciding with Claude Code once Phase 1 content is in and you can feel out the length.
 
+**[Update, post-decline] — the routes as built.** The single-page scroll won (section 16, decision 1), so the page routes above collapsed into `/`. What actually exists:
+
+```
+/                              everything a guest sees: intake, destinations, dates,
+                               getting there, costs, "can't make it" — first-visit or
+                               welcome-back, resolved from the identity cookie
+/admin                         passcode-gated dashboard (streams under <Suspense>)
+src/app/loading.tsx            streamed loading state (shared by / and /admin)
+src/app/error.tsx              error boundary in the site's voice
+
+POST   /api/respondents        create the row once intake is complete; replaces a
+                               decline-only row in one transaction (section 19, decision 5)
+PATCH  /api/respondents        autosave, including destinationRanking; 404 clears the
+                               cookie ("session lost")
+GET    /api/respondents        the caller's own response, resolved from the cookie
+POST   /api/respondents/finish Save & finish — sets submitted_at, 422 lists what's missing
+POST   /api/availability       bulk-upsert day statuses
+POST   /api/declines           create or edit a decline (200 edit / 201 create)
+DELETE /api/declines           undo, direction B only (409 no response, 404 no decline)
+POST   /api/admin/login        passcode → signed admin cookie (throttled)
+POST   /api/admin/logout
+```
+
+Every guest write route calls `guestWriteLimit` first; admin login has its own passcode-attempt throttle.
+
 ---
 
 ## 11. Build phases
 
 Structure the work as small, independently reviewable phases. Each should be a deployable preview on Vercel before moving to the next — that gives you a checkpoint to actually look at instead of reviewing a huge diff at the end. A phase isn't "done" just because it deploys — see section 14 for the actual gate (tests, types, lint, accessibility) that should pass before moving on.
+
+**[Status, 2026-09-23]:** Phases 0–4 are done and live, plus the decline feature (section 19, PR #6). Phase 4 landed as PRs #4 and #5; its decisions are in section 18. In practice there are no preview deploys: `main` deploys straight to production (see CLAUDE.md), and the checkpoint is the PR plus a green `npm run check`. Where Phase 2 below says "Vercel Postgres", read Supabase Postgres (section 4).
 
 **Phase 0 — scaffold**
 Next.js + TypeScript + Tailwind, repo on GitHub, connected to Vercel. Empty landing page deployed. Also stand up the testing harness here, not later: Vitest, Playwright, ESLint, the `npm run check` script, and the GitHub Actions workflow from section 14, all running green on the empty scaffold. Bolting testing on after Phase 2 or 3 is more work than starting with it.
@@ -309,7 +348,23 @@ Done for `POSTGRES_URL` and `POSTGRES_URL_NON_POOLING` on this project. `vercel 
 
 Local and CI test runs still don't need any of this: they set `DATABASE_URL` against a throwaway Docker Postgres, which `src/db/client.ts` prefers when present (section 16, decision 5).
 
-Add `ADMIN_PASSCODE` as an env var in Vercel (production + preview) before Phase 3.
+Add `ADMIN_PASSCODE` as an env var in Vercel (production + preview) before Phase 3. *[Superseded: `ADMIN_PASSCODE` and `ADMIN_COOKIE_SECRET` both live in Vercel **Production** and `.env.local` only, not preview or development. `vercel env pull` overwrites `.env.local` and drops them, so re-add both afterwards. See CLAUDE.md, "Environment variables".]*
+
+### Applying schema changes
+
+`src/db/schema.ts` is the source of truth. Treat `drizzle/NNNN_*.sql` as a reviewable record of each change, not as a chain to replay from scratch. **`rate_limits` has no `CREATE TABLE` in any `.sql` file**: it reached production through a push that never produced a migration file, although `drizzle/meta/0001_snapshot.json` includes it. A database built only from the `.sql` files would be missing it, and every guest write would fail in `hitRateLimit`.
+
+**Production (Supabase).** `main` deploys straight to production, so **apply the schema change before merging the code that reads it.** Otherwise the deploy goes out against a missing table. Keep changes additive (new tables or nullable columns) so the old code keeps running on the new schema. Either route works:
+
+```bash
+# Push from schema.ts over the direct (non-pooled) connection
+vercel env pull .env.local --environment=development   # then re-add the two admin secrets
+node --env-file=.env.local ./node_modules/drizzle-kit/bin.cjs push
+```
+
+…or paste the new `drizzle/NNNN_*.sql` into Supabase's SQL editor. A table created in the SQL editor gets no row-level security. The app connects as the `postgres` role, which bypasses RLS, so `ALTER TABLE <t> ENABLE ROW LEVEL SECURITY;` costs nothing. Without it, if Supabase's Data API is on, the table is readable with the public anon key.
+
+**Tests.** The e2e suite never runs the `.sql` files. `e2e/global-setup.ts` starts a throwaway `postgres:16` container (`ski-trip-e2e-pg`, port 54329) and runs `drizzle-kit push --force` against `schema.ts`, unless `DATABASE_URL` points it elsewhere. A green suite therefore says nothing about whether the migration files are correct.
 
 ---
 
@@ -340,8 +395,8 @@ This is a trip-planning tool for a dozen friends, not a production SaaS product 
   - A mobile-viewport pass (Playwright's device emulation) over the same flows — this is how most guests will actually fill it out.
 - **Type-checking and linting are gates, not suggestions.** `tsc --noEmit` and ESLint both need to pass clean before a phase counts as done. Wire both into an `npm run check` script and into CI (below) so nothing ships broken silently.
 - **Accessibility.** Run `@axe-core/playwright` against every page as part of the E2E suite. Specifically verify contrast on the gold accent against both the pine header and the snow background — the one pairing in this palette worth checking by tool and by eye. The calendar grid and the ski-days/gear toggles are currently styled `<div>`/`<label>` elements in the mockup, not native interactive controls — when these become real components, confirm they're keyboard-operable with visible focus states and correct `role`/`aria-pressed`, not just clickable.
-- **CI on every push.** A GitHub Actions workflow running lint + typecheck, Vitest, and Playwright (against a Vercel preview URL) on every PR, blocking merge on failure.
-- **Security, sized to what this app actually holds.** Every API route validates input with the section 4 Zod schemas — never trust payload shape, even from a friend group. Rate-limit the public write endpoints and the admin passcode attempts (a simple in-memory or Vercel KV token bucket is enough at this scale). Render user-supplied text (the `notes` field, etc.) as text, never raw HTML, to close off stored-XSS by construction. `ADMIN_PASSCODE` stays in Vercel env vars, never committed.
+- **CI on every push.** A GitHub Actions workflow running lint + typecheck, Vitest, and Playwright (against a Vercel preview URL) on every PR, blocking merge on failure. *[As built: `.github/workflows/ci.yml` runs on Node 22. Playwright tests a local `next build && next start` (the `playwright.config.ts` webServer) against a throwaway Docker Postgres, not a preview URL.]*
+- **Security, sized to what this app actually holds.** Every API route validates input with the section 4 Zod schemas — never trust payload shape, even from a friend group. Rate-limit the public write endpoints and the admin passcode attempts (a simple in-memory or Vercel KV token bucket is enough at this scale). *[As built: a fixed-window counter in the Postgres `rate_limits` table, `hitRateLimit` in `src/db/queries.ts`, so limits hold across serverless instances.]* Render user-supplied text (the `notes` field, etc.) as text, never raw HTML, to close off stored-XSS by construction. `ADMIN_PASSCODE` stays in Vercel env vars, never committed.
 - **Error and empty states count as part of "done."** What a guest sees if autosave fails mid-session (retry quietly, then surface a small indicator if it keeps failing), and what the admin view shows with zero responses — both belong in each phase's acceptance criteria, not a later polish pass.
 
 Calibrate this deliberately: the bar is "a stranger reading this codebase wouldn't wince," not "ready for a Fortune 500 launch." Skip load testing, multi-region failover, and SOC2-grade audit logging — none of that is proportionate to a dozen friends filling out a form.
@@ -368,7 +423,7 @@ Phase 0 and Phase 1 are complete and live (see the commit history and CLAUDE.md)
 2. **Blackout dates are fully non-interactive on the availability grid**, not just visually flagged — they can't be set to available/maybe/unavailable at all. *[Reversed during Phase 3: availability and destination preference are separate questions, and coupling them was actively harmful. Marking a day available and then choosing Steamboat left that day disabled with its row still in the database — the guest couldn't clear it and it kept feeding the admin heatmap. Blackout days are now flagged identically for everyone, regardless of destination, and stay fully selectable; the flag is carried in the accessible name rather than by disabling the control.]* Correct the mockup's "Ikon blackout (Steamboat only)" legend copy: per Phase 1's `passInfo.ts`, the Session Pass blackout (Jan 16–17 and Feb 13–14, 2027) actually hits **both Steamboat and Winter Park**; Copper Mountain is unaffected on every Ikon tier.
 3. **Destination preference is one select control**, not a separate toggle — it feeds `destination_votes` (rank 1) and the cost section just displays the chosen destination's name as text, driving which numbers show. Full multi-destination ranking is deferred past Phase 2. *[Superseded during Phase 3: destinations are now **ranked**, not picked. The cards sit in an ordered list that can be dragged, or reordered with up/down buttons on each card — the buttons are the accessible path, not a fallback, since native HTML5 drag-and-drop is unusable by keyboard and screen reader and would have failed section 14's gate outright. All ranks are written to `destination_votes` (1..n), the cost estimate follows rank 1, and the admin tally shows the full placement spread and average rank rather than only first choices — which is the point of ranking: a destination nobody puts first but everyone puts second is a real answer. The ranking starts **unset** rather than pre-filled with the declared order, so an untouched form is distinguishable from a considered ranking; an explicit "This order works for me" button exists for anyone who agrees with the default, who would otherwise have no way to say so.]*
 4. **`home_airport` is a fixed list, with no `'OTHER'`** — drop the `'OTHER'` option from section 5's SQL comment; it's unused everywhere else (mockup, Phase 1 destination/airport data, cost calculator). *[Amended after Phase 2 merged: the list is `'SFO' | 'ORD' | 'MKE' | 'MSP'`. MSP was missed in the original planning pass. No migration was needed — `home_airport` is a `text` column whose allowed values live in the TypeScript union and the Zod enum, not in a Postgres enum or check constraint, so widening it is a code change only. Unlike MKE, MSP **is** on the HDN nonstop roster (Delta), so it gets the direct-to-Steamboat note in the flight card.]*
-5. **E2E tests get a real Postgres via a Docker/Postgres service container in CI**, not a second Supabase project — keeps production Supabase completely untouched by test runs. `DATABASE_URL` (when set) overrides the Supabase connection in the app's DB client, which is how local/CI test runs point elsewhere.
+5. **E2E tests get a real Postgres via a Docker/Postgres service container in CI**, not a second Supabase project — keeps production Supabase completely untouched by test runs. `DATABASE_URL` (when set) overrides the Supabase connection in the app's DB client, which is how local/CI test runs point elsewhere. *[As built: there's no CI `services:` block. Playwright's `globalSetup` starts its own `postgres:16` container, so local and CI runs take the same path; see section 12, "Applying schema changes".]*
 6. **Pass-holders and the rental line**: when `already_has_pass` is true, `ski_days` is null (per the existing schema), so the rental line (only shown if `gear_status` is 'rental') assumes **2 ski days** for scaling purposes. This is a stated assumption, captioned visibly in the cost breakdown rather than silently baked in.
 7. **The respondent row (and autosave) isn't created on the first keystroke.** Intake has to be fully complete — name, plus-one choice, home airport, ski level, and email all filled in — before the first `POST` creates the row and autosave takes over. Trade-off, accepted explicitly: someone who fills in only part of intake and closes the tab loses that partial state, since nothing persisted yet. Acceptable given intake is a ~20-second, 5-field step.
 8. **New `email` field, not in the original section 5 schema.** Added so the host can reach respondents later. Required to complete "Save & finish" (not optional) — shown in the intake step alongside name/plus-one/airport/ski-level.
@@ -437,10 +492,10 @@ settled.
 
 9. **`ADMIN_PASSCODE` is set by Ben directly** — `vercel env add ADMIN_PASSCODE
    production` plus a line in `.env.local` — so the real value never passes
-   through an agent transcript. Per the section 12 correction, it must also
-   exist in the `development` environment (or `.env.local`) for local runs to
-   work. The e2e suite uses its own committed throwaway passcode and never
-   touches the real one.
+   through an agent transcript. For local runs it lives in `.env.local` only,
+   never in the Vercel `development` environment; the same goes for
+   `ADMIN_COOKIE_SECRET` (see CLAUDE.md). The e2e suite uses its own committed
+   throwaway passcode and never touches the real one.
 
 10. **`mockup.html` stays frozen** at its pre-build state (three airports, no
     admin view). It is a design reference from before implementation, not a
@@ -586,7 +641,9 @@ every response was a yes:
    intake *is* the undo. Direction B — a respondent row already existed, then
    declined — is undone via `DELETE /api/declines`, which requires
    `currentRespondent()` to resolve and returns 409 ("There's no way to undo
-   this without an existing response") when it can't. That combination — a
+   this without an existing response — start one instead.") when it can't,
+   or 404 ("No "can't make it" on file for this browser.") when there's no
+   decline to remove. The client treats that 404 as success. That combination — a
    call to this endpoint with no respondent row on file — shouldn't occur
    given the UI only ever calls `DELETE` from within an existing response; the
    409 guards it anyway rather than silently doing nothing.
@@ -600,7 +657,7 @@ every response was a yes:
 7. **`reason` is capped at 200 characters; the decline email is free text.**
    `DECLINE_REASON_MAX = 200` in `src/lib/schemas.ts` bounds `reason` on both
    `declineSchema` and `declineReasonSchema`. Email on the decline form is
-   `z.string().trim().optional()` — no format check — unlike `emailSchema`
+   `z.string().trim().max(254).optional()` — length-capped, no format check — unlike `emailSchema`
    (`z.email(...).max(254)`) used throughout intake: it's optional, Ben reads
    it himself, and rejecting a plausible-looking typo helps nobody here.
 
@@ -610,6 +667,22 @@ every response was a yes:
    needed in Phase 2 (section 12), and for the same reason: the production
    Postgres connection string is a Vercel Sensitive variable, unreadable by
    any migration tool run from outside Vercel's own infrastructure.
+   *[Correction, post-merge review: both halves of this were wrong.
+   (a) The connection string is readable: the section 12 correction put
+   `POSTGRES_URL` / `POSTGRES_URL_NON_POOLING` on the development target, and
+   `drizzle-kit push` works through that route. (b) "After this branch
+   merges" is the wrong order. Every page load and every intake POST now
+   queries `declines`, and merging deploys straight to production, so the
+   table must exist first or `/`, intake, and `/admin` all fail. The
+   migration is purely additive and safe to run early. The procedure now
+   lives in section 12, "Applying schema changes".]*
+
+9. **Known limit of cookie identity (recorded after review).** A guest who
+   declines in one browser and later responds from another device leaves an
+   orphaned decline row. They show up in both the decline count and the
+   respondent counts, and nothing links the two tokens. At this group size,
+   Ben reconciles it by hand in the database, as section 6 already expects
+   for device switches.
 
 These decisions supersede the corresponding details in sections 5 and 10
 above where they conflict; the rest of those sections still apply as written.
