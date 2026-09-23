@@ -1,4 +1,6 @@
 import { execFileSync } from "node:child_process";
+import { drizzle } from "drizzle-orm/postgres-js";
+import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 
 /**
@@ -52,9 +54,13 @@ export function startDatabase(): void {
 
   const deadline = Date.now() + 60_000;
   for (;;) {
-    const ready = docker(["exec", CONTAINER_NAME, "pg_isready", "-U", "ski", "-d", "skitest"], {
-      allowFailure: true,
-    });
+    // -h over TCP, not the default unix socket: the image's init phase runs a
+    // temporary socket-only server, then restarts it, so a socket check can
+    // pass just before the connection drops.
+    const ready = docker(
+      ["exec", CONTAINER_NAME, "pg_isready", "-h", "127.0.0.1", "-U", "ski", "-d", "skitest"],
+      { allowFailure: true },
+    );
     if (ready.includes("accepting connections")) return;
     if (Date.now() > deadline) {
       throw new Error("Test Postgres did not become ready within 60s");
@@ -67,11 +73,21 @@ export function stopDatabase(): void {
   docker(["rm", "-f", CONTAINER_NAME], { allowFailure: true });
 }
 
-export function pushSchema(url: string): void {
-  execFileSync("npx", ["drizzle-kit", "push", "--force"], {
-    env: { ...process.env, DATABASE_URL: url },
-    stdio: "pipe",
-  });
+/**
+ * Builds the schema by replaying `drizzle/*.sql` in journal order — the same
+ * path a fresh production database would take — rather than `drizzle-kit
+ * push` from schema.ts. Push would paper over a missing migration file: that's
+ * exactly how `rate_limits` shipped with no CREATE TABLE anywhere in the chain
+ * (PLAN.md section 12, "Applying schema changes"). Replaying the files means
+ * any drift between schema.ts and the migrations fails the suite.
+ */
+export async function migrateSchema(url: string): Promise<void> {
+  const sql = postgres(url, { max: 1, onnotice: () => {} });
+  try {
+    await migrate(drizzle(sql), { migrationsFolder: "./drizzle" });
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
 }
 
 /**
