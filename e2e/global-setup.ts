@@ -1,6 +1,6 @@
-import { databaseUrl, managesOwnDatabase, pushSchema, startDatabase } from "./database";
+import { databaseUrl, managesOwnDatabase, migrateSchema, startDatabase } from "./database";
 
-export default function globalSetup() {
+export default async function globalSetup() {
   if (managesOwnDatabase) startDatabase();
-  pushSchema(databaseUrl);
+  await migrateSchema(databaseUrl);
 }
