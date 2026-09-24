@@ -51,6 +51,9 @@ function isNotFound(err: unknown): boolean {
   return err instanceof Error && (err as { status?: number }).status === 404;
 }
 
+const UNSAVED_EDITS_MESSAGE =
+  "Your latest answers haven't saved yet — check your connection and try again.";
+
 const ResponseContext = createContext<ResponseContextValue | null>(null);
 
 export function useResponse(): ResponseContextValue {
@@ -253,7 +256,14 @@ export function ResponseProvider({
     // and hoping loses the race on a slow connection, and the person gets
     // told to fill in answers they already gave.
     try {
-      await Promise.all([fields.flush(), availability.flush()]);
+      const landed = await Promise.all([fields.flush(), availability.flush()]);
+      // An edit that hasn't reached the server would be validated (and
+      // submitted) without it. The background retries carry on; the person
+      // can press the button again once their connection is back.
+      if (landed.includes(false)) {
+        setProblems([]);
+        return { ok: false, message: UNSAVED_EDITS_MESSAGE };
+      }
 
       const res = await fetch("/api/respondents/finish", { method: "POST" });
       if (res.status === 422) {
