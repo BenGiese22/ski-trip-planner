@@ -2,6 +2,7 @@ import { useState } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ResponseProvider, useResponse } from "./ResponseProvider";
+import { AUTOSAVE_DELAY_MS } from "@/hooks/useAutosave";
 import { SessionLostNotice } from "./SessionLostNotice";
 import type { ClientDecline, ClientResponse } from "@/lib/serverSession";
 
@@ -32,11 +33,13 @@ function Harness() {
     response: current,
     problems,
     sessionLost,
+    status,
     lastSavedAt,
     decline,
     reconsidering,
     declinedOnly,
     update,
+    setAvailability,
     finish,
     startResponse,
     reconsider,
@@ -52,6 +55,7 @@ function Harness() {
       <div data-testid="finish-message">{finishMessage}</div>
       <div data-testid="problems">{problems.length}</div>
       <div data-testid="session-lost">{String(sessionLost)}</div>
+      <div data-testid="status">{status}</div>
       <div data-testid="last-saved-at">{lastSavedAt ?? ""}</div>
       <div data-testid="decline">{decline ? "present" : "null"}</div>
       <div data-testid="reconsidering">{String(reconsidering)}</div>
@@ -62,6 +66,10 @@ function Harness() {
         finish
       </button>
       <button onClick={() => update({ skiDays: 3 }, { immediate: true })}>update</button>
+      <button onClick={() => update({ skiDays: 1 })}>update-debounced</button>
+      <button onClick={() => setAvailability([{ date: "2027-01-15", status: "available" }])}>
+        set-availability
+      </button>
       <button
         onClick={() =>
           void startResponse({
@@ -295,5 +303,39 @@ describe("ResponseProvider — finish() and unsaved edits", () => {
       expect(screen.getByTestId("submitted-at")).toHaveTextContent("2027-01-01T00:00:00Z"),
     );
     expect(screen.getByTestId("ski-days")).toHaveTextContent("3");
+  });
+});
+
+const notFound = () =>
+  json({ error: "No response found for this browser. Start with the intake form." }, 404);
+
+describe("ResponseProvider — a 404'd write is not a save", () => {
+  it("a 404'd autosave is not reported as saved", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(notFound())));
+
+    renderWith(response());
+
+    fireEvent.click(screen.getByRole("button", { name: "update" }));
+
+    await waitFor(() => expect(screen.getByTestId("session-lost")).toHaveTextContent("true"));
+    expect(screen.getByTestId("status")).toHaveTextContent("idle");
+    expect(screen.getByTestId("last-saved-at")).toHaveTextContent(/^$/);
+  });
+
+  it("session loss clears the other hook's pending write", async () => {
+    const fetchMock = vi.fn(() => Promise.resolve(notFound()));
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWith(response());
+
+    // A debounced PATCH is queued under the old cookie...
+    fireEvent.click(screen.getByRole("button", { name: "update-debounced" }));
+    // ...then an immediate availability write discovers the row is gone.
+    fireEvent.click(screen.getByRole("button", { name: "set-availability" }));
+
+    await waitFor(() => expect(screen.getByTestId("session-lost")).toHaveTextContent("true"));
+    await new Promise((r) => setTimeout(r, AUTOSAVE_DELAY_MS + 100));
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
