@@ -1,10 +1,10 @@
 "use client";
 
 export default function Error({
-  reset,
+  retry,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  retry: () => void;
 }) {
   return (
     <main className="w-full min-w-0 max-w-[980px] mx-auto px-6 py-14">
@@ -15,7 +15,7 @@ export default function Error({
         </p>
         <button
           type="button"
-          onClick={reset}
+          onClick={retry}
           className="text-sm text-paper bg-pine px-4 py-2.5 rounded-md hover:bg-pine-dark focus:outline-2 focus:outline-offset-2 focus:outline-pine"
         >
           Try again
