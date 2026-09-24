@@ -313,6 +313,8 @@ export function ResponseProvider({
       setResponse((current) =>
         current ? { ...current, submittedAt: body.response.submittedAt } : body.response,
       );
+      // The server cleared any decline in the same transaction (§19.10).
+      setDecline(null);
       setProblems([]);
       setFinishedAt(Date.now());
       return { ok: true };
