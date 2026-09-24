@@ -7,6 +7,7 @@ import {
   declineRows,
   INTAKE,
   onlyRespondent,
+  pickDestination,
   respondentCount,
   respondentIdentity,
 } from "./helpers";
@@ -169,4 +170,53 @@ test("undoing a both-rows decline restores welcome back, not a new row", async (
   // Proves the row was reused, not recreated, by the undo.
   const { created_at: createdAfter } = await respondentIdentity();
   expect(createdAfter).toEqual(createdBefore);
+});
+
+/** A complete answer that clears every finish check, then Save & finish. */
+async function finishFullResponse(page: import("@playwright/test").Page) {
+  await pickDestination(page, "summitCounty");
+  await page.getByRole("button", { name: /Thu Jan 28 – Sun Jan 31/ }).click();
+  const you = page.getByRole("group", { name: "You", exact: true });
+  await you.getByRole("button", { name: "2 days" }).click();
+  await you.getByRole("button", { name: /i need gear/i }).click();
+  await page.getByRole("button", { name: /save & finish/i }).click();
+  await expect(page.getByRole("button", { name: /update my answer/i })).toBeVisible();
+}
+
+// §19 decision 10: in direction B, saying "here's my answer" is the undo too.
+test("updating the answer after a both-rows decline is the undo", async ({ page }) => {
+  await page.goto("/");
+  await completeIntake(page);
+  await finishFullResponse(page);
+  await declineAfterStarting(page);
+  expect(await declineRows()).toHaveLength(1);
+
+  await page.getByRole("button", { name: /update my answer/i }).click();
+
+  // No reload: the panel has to step aside on the finish reply alone.
+  await expect(
+    page.getByRole("heading", { name: /thanks for letting ben know/i }),
+  ).toBeHidden();
+  expect(await declineRows()).toEqual([]);
+  expect(await respondentCount()).toBe(1);
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: /welcome back, jamie/i })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: /thanks for letting ben know/i }),
+  ).toBeHidden();
+});
+
+test("an incomplete finish leaves the decline on file", async ({ page }) => {
+  await page.goto("/");
+  await completeIntake(page);
+  await declineAfterStarting(page);
+
+  await page.getByRole("button", { name: /save & finish/i }).click();
+
+  await expect(page.getByRole("alert").filter({ hasText: /almost —/i })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: /thanks for letting ben know/i }),
+  ).toBeVisible();
+  expect(await declineRows()).toHaveLength(1);
 });
