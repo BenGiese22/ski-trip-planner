@@ -339,3 +339,24 @@ describe("ResponseProvider — a 404'd write is not a save", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("ResponseProvider — recovering from a lost session", () => {
+  it("startResponse after session loss clears the notice", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(notFound())
+      .mockResolvedValueOnce(json({ response: response() }, 201));
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWith(response());
+
+    fireEvent.click(screen.getByRole("button", { name: "update" }));
+    await waitFor(() => expect(screen.getByTestId("session-lost")).toHaveTextContent("true"));
+
+    fireEvent.click(screen.getByRole("button", { name: "start-response" }));
+    await waitFor(() => expect(screen.getByTestId("response")).toHaveTextContent("present"));
+
+    expect(screen.getByTestId("session-lost")).toHaveTextContent("false");
+    expect(screen.queryByText(/start fresh below/i)).toBeNull();
+  });
+});

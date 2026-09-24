@@ -186,6 +186,8 @@ export function ResponseProvider({
       setJustCreated(true);
       setDecline(null);
       setReconsidering(false);
+      // A fresh row answers the "start fresh below" notice.
+      setSessionLost(false);
       return { ok: true };
     } catch (err) {
       return {
