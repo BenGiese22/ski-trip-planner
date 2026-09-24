@@ -269,4 +269,31 @@ describe("ResponseProvider — finish() and unsaved edits", () => {
     );
     expect(callsTo(fetchMock, "/api/respondents/finish")).toHaveLength(0);
   });
+
+  it("finish keeps an edit made while the request is in flight", async () => {
+    let resolveFinish!: (res: Response) => void;
+    const fetchMock = vi.fn((url: string) => {
+      if (url === "/api/respondents/finish") {
+        return new Promise<Response>((r) => (resolveFinish = r));
+      }
+      return Promise.resolve(json({ ok: true }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWith(response({ skiDays: 2 }));
+
+    fireEvent.click(screen.getByRole("button", { name: "finish" }));
+    await waitFor(() => expect(callsTo(fetchMock, "/api/respondents/finish")).toHaveLength(1));
+
+    // The optimistic update lands while /finish is still out.
+    fireEvent.click(screen.getByRole("button", { name: "update" }));
+    expect(screen.getByTestId("ski-days")).toHaveTextContent("3");
+
+    resolveFinish(json({ response: response({ skiDays: 2, submittedAt: "2027-01-01T00:00:00Z" }) }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("submitted-at")).toHaveTextContent("2027-01-01T00:00:00Z"),
+    );
+    expect(screen.getByTestId("ski-days")).toHaveTextContent("3");
+  });
 });

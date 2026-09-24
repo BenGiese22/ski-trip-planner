@@ -131,8 +131,9 @@ export function ResponseProvider({
    * the first was in flight would be silently reverted by the first reply.
    * Ranking two positions in quick succession reproduced exactly that.
    *
-   * The server is still the source of truth on load, and after "Save &
-   * finish", which is where its reply is applied.
+   * The server is still the source of truth on load. "Save & finish" takes
+   * only `submittedAt` from its reply, for the same reason: an edit made while
+   * /finish was in flight is newer than the snapshot it returns.
    */
   const fields = useAutosave<RespondentPatch>(async (patch) => {
     try {
@@ -281,7 +282,11 @@ export function ResponseProvider({
       }
 
       const body = await res.json();
-      setResponse(body.response);
+      // Only submittedAt comes from the reply: an edit made while this request
+      // was out is already in state and would be reverted by the snapshot.
+      setResponse((current) =>
+        current ? { ...current, submittedAt: body.response.submittedAt } : body.response,
+      );
       setProblems([]);
       setFinishedAt(Date.now());
       return { ok: true };
