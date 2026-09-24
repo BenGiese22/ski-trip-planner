@@ -12,6 +12,7 @@ import type { AvailabilityStatus } from "@/db/schema";
 import { buildMonthGrids, datesInRange, quickPicks } from "@/lib/dates";
 import {
   IDLE,
+  cancelGesture,
   endGesture,
   moveGesture,
   startGesture,
@@ -132,39 +133,60 @@ export function AvailabilityGrid() {
         : null;
     }
 
-    function reset() {
-      gesture.current = IDLE;
-      setPainting(false);
+    // The reducers decide whether an event belongs to this gesture; the
+    // listeners stay attached for exactly as long as it has an anchor.
+    function sync(next: GestureState) {
+      gesture.current = next;
+      if (next.anchor === null) setPainting(false);
     }
 
     function onMove(e: PointerEvent) {
-      const date = dateAt(e.clientX, e.clientY);
-      if (!date) return;
-      const { state, action } = moveGesture(gesture.current, date);
-      gesture.current = state;
+      const { state, action } = moveGesture(gesture.current, dateAt(e.clientX, e.clientY), e);
+      sync(state);
       if (action?.type === "paint") paintRangeRef.current(action.from, action.to);
     }
 
     // A press that never left its cell is a tap, and resolves to a cycle.
-    function onUp() {
-      const { action } = endGesture(gesture.current);
+    function onUp(e: PointerEvent) {
+      const { state, action } = endGesture(gesture.current, e.pointerId);
+      sync(state);
       if (action?.type === "cycle") cycleRef.current(action.date);
-      reset();
     }
 
     // pointercancel means the browser took the gesture over — most often it
     // decided a touch drag was really a page scroll. Nothing was intended
     // here, so the gesture is abandoned without cycling anything; routing
     // this through onUp would silently toggle the day the scroll began on.
+    function onCancel(e: PointerEvent) {
+      sync(cancelGesture(gesture.current, e.pointerId));
+    }
+
+    // Alt-tabbing away mid-drag sends the pointerup to another window, so
+    // the grid would otherwise stay "painting" until the next press.
+    function onBlur() {
+      sync(cancelGesture(gesture.current));
+    }
+
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", reset);
+    window.addEventListener("pointercancel", onCancel);
+    window.addEventListener("blur", onBlur);
     return () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", reset);
+      window.removeEventListener("pointercancel", onCancel);
+      window.removeEventListener("blur", onBlur);
     };
   }, [painting]);
+
+  // A context menu swallows the pointerup that would have ended a gesture.
+  // Right-clicks never start one, but Firefox on macOS reports a ctrl-click
+  // as button 0 and then opens the menu anyway — so abandon whatever was
+  // underway, and leave the menu itself alone.
+  function onContextMenu() {
+    gesture.current = cancelGesture(gesture.current);
+    setPainting(false);
+  }
 
   function applyQuickPick(dates: string[]) {
     const next = new Map(statuses);
@@ -212,6 +234,7 @@ export function AvailabilityGrid() {
         // a run of days in one week — to our own pointer handling instead of
         // the browser's.
         className="grid grid-cols-1 lg:grid-cols-3 gap-4 select-none touch-pan-y"
+        onContextMenu={onContextMenu}
       >
         {grids.map((grid) => (
           <div key={grid.label}>

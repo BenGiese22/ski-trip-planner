@@ -41,11 +41,17 @@ export function startGesture(
   return { anchor: date, dragged: false, pointerId: press.pointerId };
 }
 
+/** The `pointermove` fields that decide whether a move belongs to the gesture. */
+export type MoveInfo = { pointerId: number; pointerType: string; buttons: number };
+
+/** `date` is the day under the pointer, or null when it's between/outside cells. */
 export function moveGesture(
   state: GestureState,
-  date: string,
+  date: string | null,
+  move: MoveInfo,
 ): { state: GestureState; action?: GestureAction } {
-  if (!state.anchor || state.anchor === date) return { state };
+  if (move.pointerId !== state.pointerId) return { state };
+  if (!state.anchor || date === null || state.anchor === date) return { state };
 
   return {
     state: { ...state, dragged: true },
@@ -53,9 +59,27 @@ export function moveGesture(
   };
 }
 
-export function endGesture(state: GestureState): { action?: GestureAction } {
+/**
+ * Only the pointer that started the gesture can end it. A press that never
+ * left its cell is a tap, and resolves to a cycle.
+ */
+export function endGesture(
+  state: GestureState,
+  pointerId: number,
+): { state: GestureState; action?: GestureAction } {
+  if (pointerId !== state.pointerId) return { state };
   if (state.anchor && !state.dragged) {
-    return { action: { type: "cycle", date: state.anchor } };
+    return { state: IDLE, action: { type: "cycle", date: state.anchor } };
   }
-  return {};
+  return { state: IDLE };
+}
+
+/**
+ * Abandons the gesture without cycling anything — for pointercancel, a lost
+ * window focus, or a context menu. With no pointerId (a window-level event
+ * that isn't tied to one) it always abandons.
+ */
+export function cancelGesture(state: GestureState, pointerId?: number): GestureState {
+  if (pointerId !== undefined && pointerId !== state.pointerId) return state;
+  return IDLE;
 }
