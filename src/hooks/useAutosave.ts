@@ -10,6 +10,12 @@ export const AUTOSAVE_DELAY_MS = 700;
 
 const RETRY_BASE_MS = 1_000;
 
+/**
+ * Thrown by a save callback when the server says the row is gone (a 404).
+ * Retrying can't help, so the hook drops the patch rather than re-queueing it.
+ */
+export class SessionLostError extends Error {}
+
 export type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 export type Autosave<T extends object> = {
@@ -26,6 +32,12 @@ export type Autosave<T extends object> = {
    * fire-and-forget callers can `void` it safely.
    */
   flush: () => Promise<boolean>;
+  /**
+   * Forget everything: drop queued changes, cancel the pending timer and go
+   * back to idle. For when the row itself is gone and nothing queued against
+   * it can ever land.
+   */
+  reset: () => void;
 };
 
 /**
@@ -90,8 +102,16 @@ export function useAutosave<T extends object>(
       if (Object.keys(pending.current).length > 0) {
         timer.current = setTimeout(() => runRef.current(), AUTOSAVE_DELAY_MS);
       }
-    } catch {
+    } catch (err) {
       if (!mounted.current) return;
+
+      // The row is gone. Retrying would only 404 again, and restoring the
+      // patch would make flush report it as unsaved forever — drop it.
+      if (err instanceof SessionLostError) {
+        setStatus("idle");
+        return;
+      }
+
       attempts.current += 1;
 
       // Put the unsaved fields back, without clobbering anything queued while
@@ -147,5 +167,14 @@ export function useAutosave<T extends object>(
     return Object.keys(pending.current).length === 0;
   }, [run]);
 
-  return { status, lastSavedAt, queue, flush };
+  const reset = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    pending.current = {};
+    attempts.current = 0;
+    setStatus("idle");
+    setLastSavedAt(null);
+  }, []);
+
+  return { status, lastSavedAt, queue, flush, reset };
 }
