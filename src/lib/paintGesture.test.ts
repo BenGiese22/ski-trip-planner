@@ -87,6 +87,25 @@ describe("moveGesture", () => {
     expect(result.state).toBe(state);
     expect(result.action).toBeUndefined();
   });
+
+  it("abandons when a mouse move arrives with no button held", () => {
+    const state = startGesture("2027-01-20", press);
+    const result = moveGesture(state, "2027-01-22", { ...drag, buttons: 0 });
+
+    expect(result.state).toEqual(IDLE);
+    expect(result.action).toBeUndefined();
+  });
+
+  it("a touch move still paints even if buttons reads 0", () => {
+    const state = startGesture("2027-01-20", press);
+    const result = moveGesture(state, "2027-01-22", {
+      pointerId: 7,
+      pointerType: "touch",
+      buttons: 0,
+    });
+
+    expect(result.action).toEqual({ type: "paint", from: "2027-01-20", to: "2027-01-22" });
+  });
 });
 
 describe("endGesture", () => {
