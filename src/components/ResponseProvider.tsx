@@ -4,7 +4,9 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -12,7 +14,7 @@ import type { AvailabilityStatus } from "@/db/schema";
 import type { FinishProblem } from "@/lib/finish";
 import type { DeclineInput, DeclineReasonInput, IntakeInput, RespondentPatch } from "@/lib/schemas";
 import type { ClientDecline, ClientResponse } from "@/lib/serverSession";
-import { useAutosave, type SaveStatus } from "@/hooks/useAutosave";
+import { SessionLostError, useAutosave, type SaveStatus } from "@/hooks/useAutosave";
 
 export type AvailabilityEntry = { date: string; status: AvailabilityStatus };
 
@@ -114,15 +116,9 @@ export function ResponseProvider({
   // would still show whenever the last real autosave happened instead.
   const [finishedAt, setFinishedAt] = useState<number | null>(null);
 
-  // The row is confirmed gone (stale cookie, merged/deleted server-side) —
-  // starting fresh is the right next step here, not a risky one, so this
-  // clears state instead of leaving the autosave hooks to retry forever.
-  const handleSessionLost = useCallback(() => {
-    setResponse(null);
-    setDecline(null);
-    setProblems([]);
-    setSessionLost(true);
-  }, []);
+  // The save callbacks below need handleSessionLost, which needs both hooks'
+  // reset() — a ref breaks the cycle. Synced in an effect once both exist.
+  const onLostRef = useRef<() => void>(() => {});
 
   /**
    * Autosave responses are deliberately *not* written back into state. The
@@ -140,8 +136,9 @@ export function ResponseProvider({
       await postJson("/api/respondents", patch, "PATCH");
     } catch (err) {
       if (isNotFound(err)) {
-        handleSessionLost();
-        return;
+        onLostRef.current();
+        // Not a save: the hook drops the patch rather than marking it saved.
+        throw new SessionLostError();
       }
       throw err;
     }
@@ -154,12 +151,33 @@ export function ResponseProvider({
       await postJson("/api/availability", patch);
     } catch (err) {
       if (isNotFound(err)) {
-        handleSessionLost();
-        return;
+        onLostRef.current();
+        // Not a save: the hook drops the patch rather than marking it saved.
+        throw new SessionLostError();
       }
       throw err;
     }
   });
+
+  const { reset: resetFields } = fields;
+  const { reset: resetAvailability } = availability;
+
+  // The row is confirmed gone (stale cookie, merged/deleted server-side) —
+  // starting fresh is the right next step here, not a risky one, so this
+  // clears state instead of leaving the autosave hooks to retry forever. Both
+  // hooks are reset too: a write queued under the old cookie would only 404.
+  const handleSessionLost = useCallback(() => {
+    resetFields();
+    resetAvailability();
+    setResponse(null);
+    setDecline(null);
+    setProblems([]);
+    setSessionLost(true);
+  }, [resetFields, resetAvailability]);
+
+  useEffect(() => {
+    onLostRef.current = handleSessionLost;
+  }, [handleSessionLost]);
 
   const startResponse = useCallback(async (intake: IntakeInput) => {
     try {
