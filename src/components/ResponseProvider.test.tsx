@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ResponseProvider, useResponse } from "./ResponseProvider";
@@ -42,16 +43,24 @@ function Harness() {
     declineTrip,
     undoDecline,
   } = useResponse();
+  const [finishMessage, setFinishMessage] = useState("");
   return (
     <div>
       <div data-testid="response">{current ? "present" : "null"}</div>
+      <div data-testid="ski-days">{current?.skiDays ?? ""}</div>
+      <div data-testid="submitted-at">{current?.submittedAt ?? ""}</div>
+      <div data-testid="finish-message">{finishMessage}</div>
       <div data-testid="problems">{problems.length}</div>
       <div data-testid="session-lost">{String(sessionLost)}</div>
       <div data-testid="last-saved-at">{lastSavedAt ?? ""}</div>
       <div data-testid="decline">{decline ? "present" : "null"}</div>
       <div data-testid="reconsidering">{String(reconsidering)}</div>
       <div data-testid="declined-only">{String(declinedOnly)}</div>
-      <button onClick={() => void finish()}>finish</button>
+      <button
+        onClick={() => void finish().then((result) => setFinishMessage(result.message ?? ""))}
+      >
+        finish
+      </button>
       <button onClick={() => update({ skiDays: 3 }, { immediate: true })}>update</button>
       <button
         onClick={() =>
@@ -231,5 +240,33 @@ describe("ResponseProvider — finish() updates the save timestamp", () => {
     fireEvent.click(screen.getByRole("button", { name: "finish" }));
 
     await waitFor(() => expect(screen.getByTestId("last-saved-at")).not.toHaveTextContent(""));
+  });
+});
+
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+
+const callsTo = (fetchMock: ReturnType<typeof vi.fn>, url: string) =>
+  fetchMock.mock.calls.filter(([calledUrl]) => calledUrl === url);
+
+describe("ResponseProvider — finish() and unsaved edits", () => {
+  it("finish does not POST when a pending write has failed", async () => {
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (url === "/api/respondents" && init?.method === "PATCH") {
+        return Promise.reject(new TypeError("Failed to fetch"));
+      }
+      return Promise.resolve(json({ response: response({ submittedAt: "2027-01-01T00:00:00Z" }) }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWith(response());
+
+    fireEvent.click(screen.getByRole("button", { name: "update" }));
+    fireEvent.click(screen.getByRole("button", { name: "finish" }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("finish-message")).toHaveTextContent(/haven't saved yet/i),
+    );
+    expect(callsTo(fetchMock, "/api/respondents/finish")).toHaveLength(0);
   });
 });
