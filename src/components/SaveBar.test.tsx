@@ -86,6 +86,28 @@ describe("SaveBar — Save & finish failure handling", () => {
     );
   });
 
+  // The row is gone: SessionLostNotice is the message, so the bar steps
+  // aside rather than echoing the server's "No response found" copy.
+  it("hides itself instead of showing 'No response found' on a 404", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ error: "No response found for this browser. Start with the intake form." }),
+          { status: 404, headers: { "content-type": "application/json" } },
+        ),
+      ),
+    );
+    renderWith(response());
+
+    fireEvent.click(screen.getByRole("button", { name: /save & finish/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /save & finish/i })).toBeNull();
+    });
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("still shows the incomplete-answers list on a 422 (regression)", async () => {
     vi.stubGlobal(
       "fetch",
