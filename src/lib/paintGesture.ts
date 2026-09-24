@@ -14,14 +14,31 @@
 export type GestureState = {
   anchor: string | null;
   dragged: boolean;
+  pointerId: number | null;
 };
+
+export const IDLE: GestureState = { anchor: null, dragged: false, pointerId: null };
 
 export type GestureAction =
   | { type: "paint"; from: string; to: string }
   | { type: "cycle"; date: string };
 
-export function startGesture(date: string): GestureState {
-  return { anchor: date, dragged: false };
+/** The `pointerdown` fields that decide whether a press may start a gesture. */
+export type PressInfo = { pointerId: number; isPrimary: boolean; button: number };
+
+/**
+ * Only a primary pointer's primary button starts a gesture, and only when
+ * none is already underway. A right-click, a middle-click, or a second finger
+ * landing mid-drag hands back `current` untouched — the same object, so the
+ * caller can tell nothing started.
+ */
+export function startGesture(
+  date: string,
+  press: PressInfo,
+  current: GestureState = IDLE,
+): GestureState {
+  if (!press.isPrimary || press.button !== 0 || current.anchor !== null) return current;
+  return { anchor: date, dragged: false, pointerId: press.pointerId };
 }
 
 export function moveGesture(
