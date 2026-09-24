@@ -51,6 +51,11 @@ export function moveGesture(
   move: MoveInfo,
 ): { state: GestureState; action?: GestureAction } {
   if (move.pointerId !== state.pointerId) return { state };
+  // A mouse move with the primary button up means the release happened
+  // somewhere the grid never heard about (a swallowed pointerup), so the drag
+  // is over. Only mouse is checked: touch and pen report `buttons` less
+  // consistently, and they don't lose their pointerup this way.
+  if (move.pointerType === "mouse" && (move.buttons & 1) === 0) return { state: IDLE };
   if (!state.anchor || date === null || state.anchor === date) return { state };
 
   return {
