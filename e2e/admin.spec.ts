@@ -196,6 +196,34 @@ test("a finished response shows up in the heatmap", async ({ page, browser }) =>
   await expect(page.getByLabel(/Tuesday, February 2 — nobody yet/)).toBeVisible();
 });
 
+// §19 decision 10: finishing again after a direction-B decline is the undo,
+// so admin has to count the guest again.
+test("a guest who finishes again is counted again", async ({ page, browser }) => {
+  const guest = await browser.newContext();
+  const guestPage = await guest.newPage();
+  await guestPage.goto("/");
+  await completeIntake(guestPage);
+  await pickDestination(guestPage, "summitCounty");
+  await guestPage.getByRole("button", { name: /Thu Jan 28 – Sun Jan 31/ }).click();
+  const you = guestPage.getByRole("group", { name: "You", exact: true });
+  await you.getByRole("button", { name: "2 days" }).click();
+  await you.getByRole("button", { name: /i need gear/i }).click();
+  await guestPage.getByRole("button", { name: /save & finish/i }).click();
+  await expect(guestPage.getByRole("button", { name: /update my answer/i })).toBeVisible();
+
+  await declineAfterStarting(guestPage);
+  await guestPage.getByRole("button", { name: /update my answer/i }).click();
+  await expect(
+    guestPage.getByRole("heading", { name: /thanks for letting ben know/i }),
+  ).toBeHidden();
+  await guest.close();
+
+  await signIn(page);
+
+  await expect(page.getByText(/1 person has finished/i)).toBeVisible();
+  await expect(page.getByText(/can.t make it/i)).toBeHidden();
+});
+
 test("the tally lists every destination, including ones nobody picked", async ({
   page,
   browser,
