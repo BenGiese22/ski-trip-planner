@@ -73,15 +73,26 @@ export async function updateRespondent(
   return row;
 }
 
-/** Explicit endpoint, separate from autosave — see PLAN.md section 6. */
-export async function markSubmitted(respondent: Respondent): Promise<Respondent> {
+/**
+ * "Save & finish" — explicit, separate from autosave (PLAN.md section 6).
+ *
+ * Also the direction-B undo (§19): a guest who declined after starting and
+ * then finishes is saying "here's my answer", so their decline goes. One
+ * transaction — delete the decline, set `submitted_at` — so admin can never
+ * see a finished response still hidden behind a decline, mirroring
+ * `replaceDeclineWithRespondent()` for direction A.
+ */
+export async function finishResponse(respondent: Respondent): Promise<Respondent> {
   const now = new Date();
-  const [row] = await getDb()
-    .update(respondents)
-    .set({ submittedAt: now, updatedAt: now })
-    .where(eq(respondents.id, respondent.id))
-    .returning();
-  return row;
+  return getDb().transaction(async (tx) => {
+    await tx.delete(declines).where(eq(declines.cookieToken, respondent.cookieToken));
+    const [row] = await tx
+      .update(respondents)
+      .set({ submittedAt: now, updatedAt: now })
+      .where(eq(respondents.id, respondent.id))
+      .returning();
+    return row;
+  });
 }
 
 /**

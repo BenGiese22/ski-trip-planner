@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAvailability, getDestinationRanking, markSubmitted } from "@/db/queries";
+import { finishResponse, getAvailability, getDestinationRanking } from "@/db/queries";
 import { guestWriteLimit, noSuchRespondent } from "@/lib/api";
 import { finishProblems } from "@/lib/finish";
 import { currentRespondent, loadClientResponse } from "@/lib/serverSession";
@@ -12,6 +12,10 @@ import { currentRespondent, loadClientResponse } from "@/lib/serverSession";
  *
  * This is the one place validation is fair to apply, so it's the only write
  * path that can refuse.
+ *
+ * Finishing is also the direction-B undo (§19): a successful finish clears
+ * any decline on this browser's token in the same transaction. The 422 below
+ * returns before that write, so an incomplete answer leaves the decline alone.
  */
 export async function POST(request: Request) {
   const limited = await guestWriteLimit(request);
@@ -35,6 +39,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ problems }, { status: 422 });
   }
 
-  const submitted = await markSubmitted(respondent);
+  const submitted = await finishResponse(respondent);
   return NextResponse.json({ response: await loadClientResponse(submitted) });
 }
