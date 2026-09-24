@@ -1,9 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type PointerEvent as ReactPointerEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { AvailabilityStatus } from "@/db/schema";
 import { buildMonthGrids, datesInRange, quickPicks } from "@/lib/dates";
 import {
+  IDLE,
   endGesture,
   moveGesture,
   startGesture,
@@ -63,7 +71,7 @@ export function AvailabilityGrid() {
     [setAvailability],
   );
 
-  const gesture = useRef<GestureState>({ anchor: null, dragged: false });
+  const gesture = useRef<GestureState>(IDLE);
   const [painting, setPainting] = useState(false);
 
   const paintRange = useCallback(
@@ -99,8 +107,12 @@ export function AvailabilityGrid() {
     cycleRef.current = cycle;
   }, [paintRange, cycle]);
 
-  function onPointerDown(date: string) {
-    gesture.current = startGesture(date);
+  function onPointerDown(e: ReactPointerEvent, date: string) {
+    const next = startGesture(date, e, gesture.current);
+    // Unchanged means the press was refused — a right-click, a second
+    // finger — so there's no gesture to start listening for.
+    if (next === gesture.current) return;
+    gesture.current = next;
     setPainting(true);
   }
 
@@ -121,7 +133,7 @@ export function AvailabilityGrid() {
     }
 
     function reset() {
-      gesture.current = { anchor: null, dragged: false };
+      gesture.current = IDLE;
       setPainting(false);
     }
 
@@ -228,7 +240,7 @@ export function AvailabilityGrid() {
                     key={cell.date}
                     type="button"
                     data-date={cell.date}
-                    onPointerDown={() => onPointerDown(cell.date)}
+                    onPointerDown={(e) => onPointerDown(e, cell.date)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
