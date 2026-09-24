@@ -1,6 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AUTOSAVE_DELAY_MS, useAutosave } from "./useAutosave";
+import { AUTOSAVE_DELAY_MS, SessionLostError, useAutosave } from "./useAutosave";
 
 type Patch = { skiDays?: number; gearStatus?: string; notes?: string };
 
@@ -294,6 +294,34 @@ describe("useAutosave", () => {
     await advance(30_000);
 
     expect(result.current.status).toBe("saved");
+  });
+
+  // A 404 means the row is gone: retrying can only 404 again, and the change
+  // didn't land, so it mustn't read as "Saved" either.
+  it("treats SessionLostError as terminal: drops the patch, no retry, not saved", async () => {
+    const save = vi.fn().mockRejectedValue(new SessionLostError());
+    const { result } = renderHook(() => useAutosave<Patch>(save));
+
+    act(() => result.current.queue({ notes: "a" }));
+    await advance(AUTOSAVE_DELAY_MS);
+    await advance(30_000);
+
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(result.current.status).toBe("idle");
+    expect(result.current.lastSavedAt).toBeNull();
+  });
+
+  it("reset() drops queued patches and returns to idle", async () => {
+    const save = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAutosave<Patch>(save));
+
+    act(() => result.current.queue({ notes: "a" }));
+    act(() => result.current.reset());
+    await advance(AUTOSAVE_DELAY_MS * 4);
+
+    expect(save).not.toHaveBeenCalled();
+    expect(result.current.status).toBe("idle");
+    expect(result.current.lastSavedAt).toBeNull();
   });
 
   it("does not fire a pending save after unmount", async () => {
