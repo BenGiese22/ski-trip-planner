@@ -284,7 +284,8 @@ POST   /api/respondents        create the row once intake is complete; replaces 
 PATCH  /api/respondents        autosave, including destinationRanking; 404 clears the
                                cookie ("session lost")
 GET    /api/respondents        the caller's own response, resolved from the cookie
-POST   /api/respondents/finish Save & finish — sets submitted_at, 422 lists what's missing
+POST   /api/respondents/finish Save & finish — sets submitted_at and clears any decline in one
+                               transaction; 422 lists what's missing (section 19, decision 10)
 POST   /api/availability       bulk-upsert day statuses
 POST   /api/declines           create or edit a decline (200 edit / 201 create)
 DELETE /api/declines           undo, direction B only (409 no response, 404 no decline)
@@ -688,6 +689,20 @@ every response was a yes:
    respondent counts, and nothing links the two tokens. At this group size,
    Ben reconciles it by hand in the database, as section 6 already expects
    for device switches.
+
+10. **Finishing is the undo in direction B too (post-launch fix).** A guest
+    with both rows could click "Update my answer" and get a success while
+    their `declines` row — and therefore `countedForAdmin()`'s exclusion —
+    stayed put. `POST /api/respondents/finish` now calls `finishResponse()`,
+    which deletes any decline for the respondent's cookie token and sets
+    `submitted_at` in one transaction, mirroring
+    `replaceDeclineWithRespondent()` for direction A: in both directions,
+    saying "here's my answer" is what puts you back in. A 422 (incomplete
+    answer) returns before the write and leaves the decline untouched;
+    autosave PATCHes never touch `declines` either. `DELETE /api/declines`
+    remains as the explicit "Actually, I can make it" path. On the client,
+    `finish()` clears local decline state on success so `DeclinedPanel`
+    steps aside without a reload.
 
 These decisions supersede the corresponding details in sections 5 and 10
 above where they conflict; the rest of those sections still apply as written.
