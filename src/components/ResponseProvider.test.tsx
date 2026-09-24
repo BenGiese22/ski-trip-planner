@@ -47,12 +47,14 @@ function Harness() {
     undoDecline,
   } = useResponse();
   const [finishMessage, setFinishMessage] = useState("");
+  const [finishResult, setFinishResult] = useState("");
   return (
     <div>
       <div data-testid="response">{current ? "present" : "null"}</div>
       <div data-testid="ski-days">{current?.skiDays ?? ""}</div>
       <div data-testid="submitted-at">{current?.submittedAt ?? ""}</div>
       <div data-testid="finish-message">{finishMessage}</div>
+      <div data-testid="finish-result">{finishResult}</div>
       <div data-testid="problems">{problems.length}</div>
       <div data-testid="session-lost">{String(sessionLost)}</div>
       <div data-testid="status">{status}</div>
@@ -61,7 +63,12 @@ function Harness() {
       <div data-testid="reconsidering">{String(reconsidering)}</div>
       <div data-testid="declined-only">{String(declinedOnly)}</div>
       <button
-        onClick={() => void finish().then((result) => setFinishMessage(result.message ?? ""))}
+        onClick={() =>
+          void finish().then((result) => {
+            setFinishMessage(result.message ?? "");
+            setFinishResult(result.ok ? "ok" : "failed");
+          })
+        }
       >
         finish
       </button>
@@ -358,5 +365,38 @@ describe("ResponseProvider — recovering from a lost session", () => {
 
     expect(screen.getByTestId("session-lost")).toHaveTextContent("false");
     expect(screen.queryByText(/start fresh below/i)).toBeNull();
+  });
+});
+
+describe("ResponseProvider — finish() on a lost session", () => {
+  it("finish() routes a 404 to session-lost", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(notFound())));
+
+    renderWith(response());
+
+    fireEvent.click(screen.getByRole("button", { name: "finish" }));
+
+    await waitFor(() => expect(screen.getByTestId("session-lost")).toHaveTextContent("true"));
+    expect(screen.getByTestId("response")).toHaveTextContent("null");
+    expect(screen.getByTestId("problems")).toHaveTextContent("0");
+  });
+
+  // Locks the #1/#4 interaction: a 404'd write is dropped, not left pending,
+  // so flush reports nothing unsaved and finish goes on to its own 404 —
+  // rather than stacking "haven't saved yet" on top of the session-lost notice.
+  it("a 404'd autosave followed by finish shows no 'haven't saved yet'", async () => {
+    const fetchMock = vi.fn(() => Promise.resolve(notFound()));
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWith(response());
+
+    fireEvent.click(screen.getByRole("button", { name: "update" }));
+    fireEvent.click(screen.getByRole("button", { name: "finish" }));
+
+    await waitFor(() => expect(screen.getByTestId("finish-result")).toHaveTextContent("failed"));
+    expect(callsTo(fetchMock, "/api/respondents/finish")).toHaveLength(1);
+    expect(screen.getByTestId("finish-message")).toHaveTextContent(/^$/);
+    expect(screen.getByTestId("session-lost")).toHaveTextContent("true");
+    expect(screen.getByText(/start fresh below/i)).toBeVisible();
   });
 });

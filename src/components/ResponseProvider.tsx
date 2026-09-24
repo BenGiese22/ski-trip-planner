@@ -292,6 +292,12 @@ export function ResponseProvider({
         setProblems(body.problems ?? []);
         return { ok: false };
       }
+      if (res.status === 404) {
+        // The row is gone. SessionLostNotice is the message; returning one
+        // here too would leave SaveBar showing stale copy after re-intake.
+        handleSessionLost();
+        return { ok: false };
+      }
       if (!res.ok) {
         const message = await res
           .json()
@@ -314,7 +320,7 @@ export function ResponseProvider({
       setProblems([]);
       return { ok: false, message: "Couldn't save & finish — try again." };
     }
-  }, [fields, availability]);
+  }, [fields, availability, handleSessionLost]);
 
   // One indicator for two savers: an error anywhere is an error, and a save
   // anywhere in flight reads as saving.
