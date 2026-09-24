@@ -19,10 +19,13 @@ export type Autosave<T extends object> = {
   queue: (patch: Partial<T>) => void;
   /**
    * Immediate — for blur, selects and toggles, and before anything that reads
-   * the row back from the server. Resolves once the write has actually landed,
-   * so "Save & finish" can await it rather than racing it.
+   * the row back from the server. Resolves once the write has been attempted,
+   * so "Save & finish" can await it rather than racing it: true when every
+   * queued change has landed, false when something is still unsaved (the
+   * quiet background retries carry on regardless). Never rejects, so
+   * fire-and-forget callers can `void` it safely.
    */
-  flush: () => Promise<void>;
+  flush: () => Promise<boolean>;
 };
 
 /**
@@ -135,9 +138,13 @@ export function useAutosave<T extends object>(
   const flush = useCallback(async () => {
     if (timer.current) clearTimeout(timer.current);
     // First pass drains whatever is in flight or already queued; the second
-    // picks up a change that arrived behind an in-flight request.
+    // picks up a change that arrived behind an in-flight request — or retries
+    // one that just failed.
     await run();
     if (Object.keys(pending.current).length > 0) await run();
+    // A failed save puts its fields back in `pending`, so anything left here
+    // is a change the server hasn't got.
+    return Object.keys(pending.current).length === 0;
   }, [run]);
 
   return { status, lastSavedAt, queue, flush };

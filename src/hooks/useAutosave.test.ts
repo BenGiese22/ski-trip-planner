@@ -195,6 +195,39 @@ describe("useAutosave", () => {
     expect(flushed).toBe(true);
   });
 
+  // "Save & finish" must not ask the server to validate a row whose latest
+  // edit never landed — flush has to say so rather than resolve regardless.
+  it("resolves flush to false when the save keeps failing", async () => {
+    const save = vi.fn().mockRejectedValue(new Error("network"));
+    const { result } = renderHook(() => useAutosave<Patch>(save));
+
+    act(() => result.current.queue({ skiDays: 2 }));
+
+    let landed: boolean | undefined;
+    await act(async () => {
+      landed = await result.current.flush();
+    });
+
+    expect(landed).toBe(false);
+  });
+
+  it("resolves flush to true once a retried save lands", async () => {
+    const save = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("network"))
+      .mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAutosave<Patch>(save));
+
+    act(() => result.current.queue({ skiDays: 2 }));
+
+    let landed: boolean | undefined;
+    await act(async () => {
+      landed = await result.current.flush();
+    });
+
+    expect(landed).toBe(true);
+  });
+
   // Section 14: retry quietly, and only surface an indicator if it keeps
   // failing. A single dropped request on flaky wifi shouldn't alarm anyone.
   it("retries a failed save without reporting an error", async () => {
