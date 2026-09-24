@@ -234,6 +234,47 @@ describe("ResponseProvider — decline state", () => {
     await waitFor(() => expect(screen.getByTestId("session-lost")).toHaveTextContent("true"));
     expect(screen.getByTestId("decline")).toHaveTextContent("null");
   });
+
+  it("finish success clears the decline", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ response: response({ submittedAt: "2027-01-01T00:00:00Z" }) }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    );
+
+    renderWith(response(), { name: "Jamie Rivera" });
+    expect(screen.getByTestId("decline")).toHaveTextContent("present");
+
+    fireEvent.click(screen.getByRole("button", { name: "finish" }));
+
+    await waitFor(() => expect(screen.getByTestId("last-saved-at")).not.toHaveTextContent(""));
+    expect(screen.getByTestId("decline")).toHaveTextContent("null");
+  });
+
+  it("finish 422 keeps the decline", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            problems: [{ field: "destinationRanking", message: "Rank at least one destination." }],
+          }),
+          { status: 422, headers: { "content-type": "application/json" } },
+        ),
+      ),
+    );
+
+    renderWith(response(), { name: "Jamie Rivera" });
+
+    fireEvent.click(screen.getByRole("button", { name: "finish" }));
+
+    await waitFor(() => expect(screen.getByTestId("problems")).toHaveTextContent("1"));
+    expect(screen.getByTestId("decline")).toHaveTextContent("present");
+  });
 });
 
 describe("ResponseProvider — finish() updates the save timestamp", () => {
